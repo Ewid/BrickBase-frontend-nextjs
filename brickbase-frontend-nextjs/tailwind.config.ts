@@ -11,6 +11,14 @@ export default {
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
+        muted: "var(--text-muted)",
+        border: "var(--border-color)",
+        input: "var(--input-bg)",
+        primary: "var(--button-primary)",
+        secondary: "var(--button-secondary)",
+      },
+      fontFamily: {
+        sans: ["var(--font-space-grotesk)", "var(--font-noto-sans)", "sans-serif"],
       },
     },
   },

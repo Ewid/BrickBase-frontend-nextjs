@@ -3,8 +3,13 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #111a22;
+  --foreground: #ffffff;
+  --text-muted: #93adc8;
+  --border-color: #243647;
+  --input-bg: #1a2632;
+  --button-primary: #1980e6;
+  --button-secondary: #243647;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -17,5 +22,16 @@
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-space-grotesk), var(--font-noto-sans), sans-serif;
+}
+
+@layer base {
+  input {
+    @apply placeholder:text-[#93adc8];
+  }
+}
+
+/* Custom classes */
+.card-border {
+  @apply border border-[#344d65] bg-[#1a2632];
 }
