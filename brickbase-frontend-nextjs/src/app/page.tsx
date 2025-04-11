@@ -1,33 +1,24 @@
-import MainLayout from '@/components/layout/MainLayout';
-import HeroBanner from '@/components/layout/HeroBanner';
-import PropertyList from '@/components/property/PropertyList';
-import CryptoBuySteps from '@/components/web3/CryptoBuySteps';
-import { propertyService } from '@/services/propertyService';
+'use client'; // Add this directive for client-side hooks
 
-export default async function Home() {
-  // Fetch data from our services
-  const featuredProperties = await propertyService.getFeaturedProperties();
+import React from 'react';
+import Navbar from '@/components/Navbar';
+import Hero from '@/components/Hero';
+import FeaturedProperties from '@/components/FeaturedProperties';
+import Stats from '@/components/Stats';
+import ConnectWallet from '@/components/ConnectWallet';
+import Footer from '@/components/Footer';
 
+const Home = () => {
   return (
-    <MainLayout>
-      <HeroBanner
-        title="Own the future of Real Estate with BrickBase"
-        subtitle="Experience the future of real estate with NFTs and blockchain technology"
-        backgroundImage="https://cdn.usegalileo.ai/sdxl10/467bffaa-4164-4416-b906-e619d638dd15.png"
-        searchPlaceholder="Search by city, neighborhood, address"
-      />
-      
-      <PropertyList 
-        title="Featured properties" 
-        properties={featuredProperties} 
-        showInfoCards={true}
-      />
-      
-      <CryptoBuySteps 
-        title="How to buy with crypto"
-        showStartButton={true}
-        showDetailedSteps={false}
-      />
-    </MainLayout>
+    <div className="min-h-screen bg-crypto-dark">
+      <Navbar />
+      <Hero />
+      <FeaturedProperties />
+      <Stats />
+      <ConnectWallet />
+      <Footer />
+    </div>
   );
-}
+};
+
+export default Home;

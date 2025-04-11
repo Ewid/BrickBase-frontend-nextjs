@@ -2,36 +2,67 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #111a22;
-  --foreground: #ffffff;
-  --text-muted: #93adc8;
-  --border-color: #243647;
-  --input-bg: #1a2632;
-  --button-primary: #1980e6;
-  --button-secondary: #243647;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: var(--font-space-grotesk), var(--font-noto-sans), sans-serif;
-}
-
 @layer base {
-  input {
-    @apply placeholder:text-[#93adc8];
+  :root {
+    --background: 230 33% 9%;
+    --foreground: 210 40% 98%;
+
+    --card: 230 20% 12%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 230 20% 12%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 260 70% 60%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 48%;
+    
+    --radius: 0.5rem;
+
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  body {
+    @apply bg-crypto-dark text-white font-sans;
   }
 }
 
-/* Custom classes */
-.card-border {
-  @apply border border-[#344d65] bg-[#1a2632];
-}
+@layer components {
+  .glass-card {
+    @apply bg-opacity-20 backdrop-blur-lg bg-white/10 border border-white/20 shadow-glass;
+  }
+  
+  .crypto-btn {
+    @apply px-6 py-3 rounded-lg font-medium transition-all duration-300 bg-gradient-to-r from-crypto-purple to-crypto-teal text-white hover:shadow-neon;
+  }
+  
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-crypto-light to-crypto-teal;
+  }
+  
+  .card-hover {
+    @apply transition-all duration-300 hover:-translate-y-2 hover:shadow-neon;
+  }
+} 

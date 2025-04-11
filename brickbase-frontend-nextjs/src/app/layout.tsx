@@ -1,18 +1,9 @@
-import type { Metadata } from "next";
-import { Space_Grotesk, Noto_Sans } from "next/font/google";
 import "./globals.css";
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import { Providers } from "@/components/Providers";
 
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space-grotesk",
-  subsets: ["latin"],
-  weight: ["400", "500", "700"],
-});
-
-const notoSans = Noto_Sans({
-  variable: "--font-noto-sans",
-  subsets: ["latin"],
-  weight: ["400", "500", "700", "900"],
-});
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "BrickBase - Own the future with blockchain real estate",
@@ -26,10 +17,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${spaceGrotesk.variable} ${notoSans.variable} antialiased`}
-      >
-        {children}
+      <body className={inter.className}>
+        <Providers>
+          {children}
+        </Providers>
       </body>
     </html>
   );
