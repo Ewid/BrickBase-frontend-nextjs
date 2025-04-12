@@ -24,9 +24,9 @@ const Navbar = () => {
           <Link href="/about" className="text-white hover:text-crypto-light transition-colors">About</Link>
         </div>
 
-        {/* Web3Modal Connect wallet button */} 
+        {/* Reown AppKit Connect wallet button */}
         <div className="hidden md:block">
-          <w3m-button />
+          <appkit-button />
         </div>
 
         {/* Mobile menu button (using Shadcn Button) */}
@@ -62,9 +62,9 @@ const Navbar = () => {
               <User className="h-5 w-5" />
               <span>About</span>
             </Link>
-            {/* Web3Modal Connect button in mobile menu */}
+            {/* Reown AppKit Connect button in mobile menu */}
             <div className="pt-2">
-              <w3m-button />
+              <appkit-button />
             </div>
           </div>
         </div>
