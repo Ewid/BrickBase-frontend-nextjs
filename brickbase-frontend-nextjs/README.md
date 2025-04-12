@@ -1,94 +1,142 @@
 # BrickBase Frontend
 
-A modern Next.js frontend for the BrickBase platform, which allows users to browse, buy, and sell real estate properties as NFTs using blockchain technology.
+Frontend application for the BrickBase real estate tokenization platform.
 
-## Features
+## Overview
 
-- Modern dark-themed UI inspired by Web3 applications
-- Property listings with NFT support
-- Responsive design optimized for all device sizes
-- Search functionality for properties
-- "How to buy with crypto" guides
-- Featured properties and NFTs
-- Clean, component-based architecture
+This Next.js application provides the user interface for interacting with the BrickBase platform, enabling users to:
+- Browse tokenized properties
+- Purchase and manage property tokens
+- Participate in DAO governance
+- View property details and transaction history
+- Connect wallets and manage investments
 
 ## Tech Stack
 
-- **Next.js 15**: For server-side rendering and routing
-- **React 19**: For UI components
-- **TypeScript**: For type safety
-- **TailwindCSS**: For styling
-- **Ethers.js / wagmi**: For Web3 integration (placeholders for future implementation)
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+ and npm/yarn
-
-### Installation
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/BrickBase-frontend-nextjs.git
-   ```
-
-2. Navigate to the project directory:
-   ```bash
-   cd BrickBase-frontend-nextjs
-   ```
-
-3. Install dependencies:
-   ```bash
-   npm install
-   # or
-   yarn install
-   ```
-
-4. Run the development server:
-   ```bash
-   npm run dev
-   # or
-   yarn dev
-   ```
-
-5. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
+- **Framework**: Next.js 14 with App Router
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS
+- **Web3**: Ethers.js
+- **State Management**: React Query
+- **Wallet Connection**: Web3Modal
+- **UI Components**: shadcn/ui
 
 ## Project Structure
 
 ```
-├── public/                  # Static assets
-├── src/
-│   ├── app/                 # Next.js app router pages
-│   ├── components/          # React components
-│   │   ├── common/          # Common UI components
-│   │   ├── layout/          # Layout components (Header, Footer, etc.)
-│   │   ├── property/        # Property-related components
-│   │   └── web3/            # Web3/blockchain-related components
-│   ├── services/            # API services
-│   ├── store/               # State management
-│   ├── types/               # TypeScript type definitions
-│   └── utils/               # Utility functions
+src/
+├── app/                    # App router pages
+├── components/            
+│   ├── common/            # Reusable components
+│   ├── layout/            # Layout components
+│   └── web3/              # Web3 specific components
+├── config/                # Configuration files
+├── hooks/                 # Custom React hooks
+├── lib/                   # Utility functions
+├── services/              # API and blockchain services
+├── store/                 # State management
+└── types/                 # TypeScript types
 ```
 
-## Pages
+## Getting Started
 
-- **Home**: Landing page with featured properties
-- **Discover**: Browse all properties and NFTs
-- **Invest**: Investment opportunities (placeholder)
-- **Sell**: List properties for sale (placeholder)
-- **About**: About BrickBase (placeholder)
-- **Help**: Help and support (placeholder)
+### Prerequisites
+- Node.js 18+
+- npm/yarn
+- MetaMask or similar Web3 wallet
 
-## Future Improvements
+### Installation
 
-- Implement full Web3 functionality with wallet connection
-- Add property detail pages
-- Create user profiles and dashboards
-- Add favorites and saved searches
-- Implement notifications for property status changes
-- Add marketplace functionality for buying and selling
+1. Clone the repository
+```
+git clone https://github.com/Ewid/brickbase-frontend.git
+cd brickbase-frontend
+```
 
-## License
+2. Install dependencies
+```
+npm install
+```
 
-[MIT](LICENSE)
+3. Set up environment variables
+```
+cp .env.example .env.local
+```
+
+4. Start the development server
+```
+npm run dev
+```
+
+### Environment Variables
+
+Create a `.env.local` file with the following:
+```
+NEXT_PUBLIC_CONTRACT_ADDRESS=your_contract_address
+NEXT_PUBLIC_CHAIN_ID=11155111  # Sepolia testnet
+NEXT_PUBLIC_INFURA_ID=your_infura_id
+NEXT_PUBLIC_API_URL=http://localhost:3001/api
+```
+
+## Development
+
+### Key Features Implementation
+
+1. **Property Listing**
+   - Grid view of available properties
+   - Detailed property information
+   - Real-time price updates
+
+2. **Investment Management**
+   - Token purchase interface
+   - Portfolio overview
+   - Transaction history
+
+3. **DAO Governance**
+   - Proposal creation and voting
+   - Governance dashboard
+   - Vote delegation
+
+4. **Wallet Integration**
+   - Multiple wallet support
+   - Transaction signing
+   - Balance checking
+
+### Commands
+
+```
+# Development
+npm run dev
+
+# Build
+npm run build
+
+# Production
+npm start
+
+# Testing
+npm run test
+
+# Linting
+npm run lint
+```
+
+## Testing
+
+```
+# Run unit tests
+npm run test
+
+# Run e2e tests
+npm run test:e2e
+
+# Run with coverage
+npm run test:coverage
+```
+
+## Deployment
+
+The application can be deployed to Vercel with the following steps:
+1. Connect your GitHub repository to Vercel
+2. Configure environment variables
+3. Deploy

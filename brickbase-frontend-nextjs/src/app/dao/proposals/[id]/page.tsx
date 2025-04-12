@@ -11,7 +11,7 @@ import { ProposalDto } from '@/types/dtos'; // Assuming ProposalDto covers all n
 import { formatUnits } from 'ethers';
 import Link from 'next/link';
 import { useAccount, useWriteContract } from 'wagmi';
-import DAO_ABI from '@/abis/PropertyDAO.json'; // Import the ABI
+import DAO_ABI from '@/abis/PropertyDAO.json';
 import { toast } from "sonner";
 
 // --- Constants --- TODO: Move to config/env

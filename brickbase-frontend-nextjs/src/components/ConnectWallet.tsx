@@ -54,7 +54,7 @@ const ConnectWallet = () => {
             </div>
             
             <div className="flex flex-wrap gap-4 items-center">
-              <w3m-button />
+              <appkit-button />
               <Link href="/learn">
                 <Button variant="outline" className="border-crypto-light/30 text-crypto-light hover:bg-crypto-light/10">
                   Learn More
