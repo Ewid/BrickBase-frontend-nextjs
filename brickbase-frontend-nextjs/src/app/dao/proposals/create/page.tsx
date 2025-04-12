@@ -25,7 +25,7 @@ import { useAccount, useWriteContract } from 'wagmi';
 import DAO_ABI from '@/abis/PropertyDAO.json'; // Import the ABI
 import { toast } from "sonner";
 import { parseEther } from 'ethers'; // For handling ETH values if needed
-import { useRouter } from 'next/navigation'; // Import useRouter for redirect
+import { useRouter } from 'next/navigation';
 
 // --- Constants --- TODO: Move to config/env
 const DAO_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_DAO_CONTRACT_ADDRESS as `0x${string}` | undefined;
