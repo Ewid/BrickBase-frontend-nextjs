@@ -88,8 +88,8 @@ const FeaturedProperties = () => {
     return properties.map(property => (
       <PropertyCard
         key={property.tokenId}
-        id={property.tokenId}
-        nftAddress={property.nftAddress}
+        id={Number(property.tokenId) || 0}
+        nftAddress={property.id}
         title={property.metadata?.name || 'Unnamed Property'}
         location={property.metadata?.attributes?.find((attr: any) => attr.trait_type === 'Address')?.value || 'N/A'}
         imageUrl={property.metadata?.image || ''}
