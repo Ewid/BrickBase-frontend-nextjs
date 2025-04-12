@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -51,11 +53,8 @@ const ConnectWallet = () => {
               </div>
             </div>
             
-            <div className="flex flex-wrap gap-4">
-              <Button className="crypto-btn animate-pulse-glow">
-                <Wallet className="mr-2 h-4 w-4" />
-                Connect Wallet
-              </Button>
+            <div className="flex flex-wrap gap-4 items-center">
+              <w3m-button />
               <Link href="/learn">
                 <Button variant="outline" className="border-crypto-light/30 text-crypto-light hover:bg-crypto-light/10">
                   Learn More

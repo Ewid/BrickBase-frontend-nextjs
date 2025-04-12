@@ -2,8 +2,8 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Button } from "@/components/ui/button";
 import { Menu, X, Home, Building2, Wallet, ChartBar, User } from 'lucide-react';
+import { Button as ShadcnButton } from "@/components/ui/button";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -24,24 +24,21 @@ const Navbar = () => {
           <Link href="/about" className="text-white hover:text-crypto-light transition-colors">About</Link>
         </div>
 
-        {/* Connect wallet button */}
+        {/* Web3Modal Connect wallet button */} 
         <div className="hidden md:block">
-          <Button className="crypto-btn">
-            <Wallet className="mr-2 h-4 w-4" />
-            Connect Wallet
-          </Button>
+          <w3m-button />
         </div>
 
-        {/* Mobile menu button */}
+        {/* Mobile menu button (using Shadcn Button) */}
         <div className="md:hidden">
-          <Button 
+          <ShadcnButton 
             variant="ghost" 
             size="icon" 
             onClick={() => setIsOpen(!isOpen)}
             className="text-white"
           >
             {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </Button>
+          </ShadcnButton>
         </div>
       </div>
 
@@ -49,26 +46,26 @@ const Navbar = () => {
       {isOpen && (
         <div className="md:hidden glass-card mt-2 py-4 px-4 rounded-lg">
           <div className="flex flex-col space-y-4">
-            <Link href="/" className="flex items-center space-x-2 text-white hover:text-crypto-light transition-colors p-2">
+            <Link href="/" className="flex items-center space-x-2 text-white hover:text-crypto-light transition-colors p-2" onClick={() => setIsOpen(false)}>
               <Home className="h-5 w-5" />
               <span>Home</span>
             </Link>
-            <Link href="/properties" className="flex items-center space-x-2 text-white hover:text-crypto-light transition-colors p-2">
+            <Link href="/properties" className="flex items-center space-x-2 text-white hover:text-crypto-light transition-colors p-2" onClick={() => setIsOpen(false)}>
               <Building2 className="h-5 w-5" />
               <span>Properties</span>
             </Link>
-            <Link href="/marketplace" className="flex items-center space-x-2 text-white hover:text-crypto-light transition-colors p-2">
+            <Link href="/marketplace" className="flex items-center space-x-2 text-white hover:text-crypto-light transition-colors p-2" onClick={() => setIsOpen(false)}>
               <ChartBar className="h-5 w-5" />
               <span>Marketplace</span>
             </Link>
-            <Link href="/about" className="flex items-center space-x-2 text-white hover:text-crypto-light transition-colors p-2">
+            <Link href="/about" className="flex items-center space-x-2 text-white hover:text-crypto-light transition-colors p-2" onClick={() => setIsOpen(false)}>
               <User className="h-5 w-5" />
               <span>About</span>
             </Link>
-            <Button className="crypto-btn w-full">
-              <Wallet className="mr-2 h-4 w-4" />
-              Connect Wallet
-            </Button>
+            {/* Web3Modal Connect button in mobile menu */}
+            <div className="pt-2">
+              <w3m-button />
+            </div>
           </div>
         </div>
       )}

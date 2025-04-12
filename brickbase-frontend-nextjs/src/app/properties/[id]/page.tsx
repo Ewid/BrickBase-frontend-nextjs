@@ -1,94 +1,126 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
-import { Building2, MapPin, Maximize2, Bitcoin, Tag, Wallet, ArrowLeft } from "lucide-react";
+import { Building2, MapPin, Bitcoin, Tag, Wallet, ArrowLeft, Loader2, AlertTriangle } from "lucide-react";
 import Link from 'next/link';
+import { PropertyDto } from '@/types/dtos';
+import { formatUnits } from 'ethers';
 
-// Mock data - replace with actual data fetching
-const mockProperties = [
-  {
-    id: 1,
-    title: "Neon Heights Tower",
-    location: "Neo District, Metaverse",
-    price: "$3,450,000",
-    cryptoPrice: "125.5 ETH",
-    imageUrl: "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1470&q=80",
-    sqft: 2800,
-    description: "Experience luxury living in the heart of the Neo District. This stunning tower offers panoramic views and state-of-the-art amenities.",
-    bedrooms: 3,
-    bathrooms: 4,
-    yearBuilt: 2077,
-    featured: true
-  },
-  {
-    id: 2,
-    title: "Quantum View Residence",
-    location: "Cyber Park, Decentraland",
-    price: "$1,750,000",
-    cryptoPrice: "63.2 ETH",
-    imageUrl: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1470&q=80",
-    sqft: 1950,
-    description: "A modern residence overlooking the vibrant Cyber Park. Features open-plan living and direct access to virtual green spaces.",
-    bedrooms: 2,
-    bathrooms: 2,
-    yearBuilt: 2088,
-    featured: false
-  },
-  {
-    id: 3,
-    title: "Digital Horizon Complex",
-    location: "Blockchain Boulevard, Sandbox",
-    price: "$5,200,000",
-    cryptoPrice: "189.4 ETH",
-    imageUrl: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1453&q=80",
-    sqft: 4200,
-    description: "An expansive complex on the prestigious Blockchain Boulevard. Ideal for large gatherings or commercial ventures in the Sandbox metaverse.",
-    bedrooms: 5,
-    bathrooms: 6,
-    yearBuilt: 2095,
-    featured: true
-  },
-  {
-    id: 4,
-    title: "Ethereal Sky Penthouse",
-    location: "Token Heights, Ethereum City",
-    price: "$2,950,000",
-    cryptoPrice: "106.8 ETH",
-    imageUrl: "https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1470&q=80",
-    sqft: 2300,
-    description: "Top-floor living with breathtaking views of Ethereum City. This penthouse boasts high-end finishes and exclusive rooftop access.",
-    bedrooms: 2,
-    bathrooms: 3,
-    yearBuilt: 2080,
-    featured: false
+// Helper function to fetch IPFS metadata
+async function fetchIpfsMetadata(tokenUri: string): Promise<Record<string, any> | null> {
+  if (!tokenUri || !tokenUri.startsWith('ipfs://')) {
+    return null;
   }
-];
+  // Use a public gateway or your own Pinata gateway
+  const cid = tokenUri.replace('ipfs://', '');
+  const url = `https://ipfs.io/ipfs/${cid}`; // Example public gateway
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error(`Failed to fetch IPFS data: ${response.statusText}`);
+      return null;
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching IPFS metadata:", error);
+    return null;
+  }
+}
 
 const PropertyDetailPage = () => {
   const params = useParams();
-  const propertyId = params?.id;
+  const propertyNftAddress = params?.id as string | undefined;
 
-  // Find the property based on ID - replace with actual data fetching logic
-  const property = mockProperties.find(p => p.id.toString() === propertyId);
+  const [property, setProperty] = useState<PropertyDto | null>(null);
+  const [metadata, setMetadata] = useState<Record<string, any> | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!property) {
-    // Optional: Render a specific component or redirect if property not found
-    // For now, we rely on the main not-found handler
+  useEffect(() => {
+    const fetchPropertyDetails = async () => {
+      if (!propertyNftAddress) {
+        setError('Property address not found in URL.');
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+        const response = await fetch(`${apiUrl}/properties/${propertyNftAddress}`);
+        
+        if (response.status === 404) {
+           throw new Error('Property not found via API.');
+        }
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data: PropertyDto = await response.json();
+        setProperty(data);
+
+        // Fetch IPFS metadata after getting the DTO
+        if (data.tokenUri) {
+          const fetchedMetadata = await fetchIpfsMetadata(data.tokenUri);
+          setMetadata(fetchedMetadata);
+        }
+
+      } catch (err: any) {
+        console.error("Failed to fetch property details:", err);
+        setError(err.message || 'Failed to load property details.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPropertyDetails();
+  }, [propertyNftAddress]);
+
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-crypto-dark flex flex-col items-center justify-center text-center p-6">
-         <Navbar />
-         <div className="flex-grow flex items-center justify-center">
-            <p className="text-xl text-gray-400">Property not found.</p>
-         </div>
-         <Footer />
+      <div className="min-h-screen bg-crypto-dark flex flex-col items-center justify-center">
+        <Loader2 className="h-16 w-16 animate-spin text-crypto-light mb-4" />
+        <p className="text-lg text-gray-400">Loading Property Details...</p>
       </div>
     );
   }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-crypto-dark flex flex-col items-center justify-center text-center p-6">
+        <AlertTriangle className="h-16 w-16 text-red-500 mb-4" />
+        <h2 className="text-2xl font-bold text-red-400 mb-2">Error Loading Property</h2>
+        <p className="text-gray-400 mb-6">{error}</p>
+        <Link href="/properties">
+            <Button variant="outline" className="border-crypto-light/30 text-crypto-light hover:bg-crypto-light/10">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                 Back to Properties
+            </Button>
+         </Link>
+      </div>
+    );
+  }
+
+  if (!property) {
+    return (
+       <div className="min-h-screen bg-crypto-dark flex flex-col items-center justify-center text-center p-6">
+         <p className="text-xl text-gray-400">Property data could not be loaded.</p>
+         <Link href="/properties" className="mt-4 text-crypto-light hover:underline">
+            Go Back
+         </Link>
+       </div>
+    );
+  }
+  
+  const displayTitle = metadata?.name || 'Unnamed Property';
+  const displayImage = metadata?.image || '';
+  const displayDescription = metadata?.description || 'No description available.';
 
   return (
     <div className="min-h-screen bg-crypto-dark">
@@ -102,72 +134,80 @@ const PropertyDetailPage = () => {
         </div>
         
         <div className="glass-card rounded-xl overflow-hidden">
-          <div className="relative h-96 w-full">
-            <Image 
-              src={property.imageUrl} 
-              alt={property.title}
-              fill
-              className="object-cover"
-              sizes="(max-width: 1024px) 100vw, 1024px"
-              priority // Prioritize loading the main image
-            />
+          <div className="relative h-96 w-full bg-gray-800">
+            {displayImage ? (
+               <Image 
+                 src={displayImage} 
+                 alt={displayTitle}
+                 fill
+                 className="object-cover"
+                 sizes="(max-width: 1024px) 100vw, 1024px"
+                 priority
+               />
+             ) : (
+               <div className="w-full h-full flex items-center justify-center text-gray-400">Image loading or unavailable...</div>
+             )}
           </div>
           
           <div className="p-6 md:p-8">
             <div className="flex flex-col md:flex-row justify-between md:items-center mb-4">
-              <h1 className="text-3xl font-bold mb-2 md:mb-0">{property.title}</h1>
+              <h1 className="text-3xl font-bold mb-2 md:mb-0" title={displayTitle}>{displayTitle}</h1>
               <div className="flex items-center text-gray-400 text-sm">
                 <MapPin className="h-4 w-4 mr-1" />
-                {property.location}
+                {property.propertyDetails.physicalAddress}
               </div>
             </div>
 
             <div className="flex flex-wrap gap-4 mb-6 border-b border-white/10 pb-6">
                <div className="flex items-center gap-1 text-sm bg-crypto-dark/50 px-3 py-1 rounded-full">
                   <Building2 className="h-4 w-4 text-crypto-light" />
-                  <span>{property.sqft} sqft</span>
+                  <span>{property.propertyDetails.sqft} sqft</span>
                 </div>
                 <div className="flex items-center gap-1 text-sm bg-crypto-dark/50 px-3 py-1 rounded-full">
                   <Tag className="h-4 w-4 text-crypto-light" />
-                  <span>{property.bedrooms} Beds</span>
+                  <span>{property.propertyDetails.bedrooms} Beds</span>
                 </div>
                  <div className="flex items-center gap-1 text-sm bg-crypto-dark/50 px-3 py-1 rounded-full">
                   <Tag className="h-4 w-4 text-crypto-light" />
-                  <span>{property.bathrooms} Baths</span>
+                  <span>{property.propertyDetails.bathrooms} Baths</span>
                 </div>
                  <div className="flex items-center gap-1 text-sm bg-crypto-dark/50 px-3 py-1 rounded-full">
                   <Tag className="h-4 w-4 text-crypto-light" />
-                  <span>Built: {property.yearBuilt}</span>
+                  <span>Built: {property.propertyDetails.yearBuilt}</span>
+                </div>
+                <div className="flex items-center gap-1 text-sm bg-crypto-dark/50 px-3 py-1 rounded-full">
+                  <Tag className="h-4 w-4 text-crypto-light" />
+                  <span>Type: {property.propertyDetails.propertyType}</span>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-6">
               <div className="md:col-span-2">
                 <h2 className="text-xl font-semibold mb-3">Description</h2>
-                <p className="text-gray-300 leading-relaxed">{property.description}</p>
+                <p className="text-gray-300 leading-relaxed">{displayDescription}</p>
+                
+                <h3 className="text-lg font-semibold mt-6 mb-2">Contract Details</h3>
+                <div className="text-xs text-gray-400 space-y-1 break-all">
+                    <p>NFT Address: {property.nftAddress}</p>
+                    <p>Token ID: {property.tokenId}</p>
+                    <p>Fractional Token: {property.propertyDetails.associatedPropertyToken}</p>
+                    <p>Token URI: {property.tokenUri}</p>
+                    <p>Owner: {property.owner}</p>
+                </div>
               </div>
               
               <div className="md:col-span-1 space-y-6">
-                <div>
-                  <p className="text-sm text-gray-400 mb-1">Current Price</p>
-                  <p className="text-crypto-light font-bold text-3xl mb-1">{property.price}</p>
-                  <div className="flex items-center text-gray-400 text-sm">
-                    <Bitcoin className="h-4 w-4 mr-1 text-yellow-500" />
-                    {property.cryptoPrice}
-                  </div>
+                 <div className="bg-gray-800/50 p-4 rounded-lg text-center">
+                    <p className="text-gray-400 text-sm">Purchase options available on the Marketplace.</p>
+                    <Link href="/marketplace" className="mt-2 inline-block">
+                        <Button variant="outline" className="border-crypto-light/30 text-crypto-light hover:bg-crypto-light/10">
+                            Go to Marketplace
+                        </Button>
+                    </Link>
                 </div>
-                <Button className="w-full crypto-btn animate-pulse-glow">
-                  <Wallet className="mr-2 h-5 w-5" />
-                  Connect Wallet to Buy
-                </Button>
-                 <Button variant="outline" className="w-full border-crypto-light/30 text-crypto-light hover:bg-crypto-light/10">
-                  Make an Offer
-                </Button>
               </div>
             </div>
             
-            {/* Add sections for NFT details, transaction history, etc. later */}
-
           </div>
         </div>
       </main>

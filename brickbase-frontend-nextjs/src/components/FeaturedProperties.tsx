@@ -1,52 +1,81 @@
-import React from 'react';
+'use client'; // Needs client hooks
+
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Filter, ArrowDownAZ } from 'lucide-react';
+import { ArrowRight, Filter, ArrowDownAZ, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import PropertyCard from './PropertyCard';
+import { PropertyDto } from '@/types/dtos';
 
 const FeaturedProperties = () => {
-  const properties = [
-    {
-      id: 1,
-      title: "Neon Heights Tower",
-      location: "Neo District, Metaverse",
-      price: "$3,450,000",
-      cryptoPrice: "125.5 ETH",
-      imageUrl: "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1470&q=80",
-      sqft: 2800,
-      featured: true
-    },
-    {
-      id: 2,
-      title: "Quantum View Residence",
-      location: "Cyber Park, Decentraland",
-      price: "$1,750,000",
-      cryptoPrice: "63.2 ETH",
-      imageUrl: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1470&q=80",
-      sqft: 1950,
-      featured: false
-    },
-    {
-      id: 3,
-      title: "Digital Horizon Complex",
-      location: "Blockchain Boulevard, Sandbox",
-      price: "$5,200,000",
-      cryptoPrice: "189.4 ETH",
-      imageUrl: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1453&q=80",
-      sqft: 4200,
-      featured: true
-    },
-    {
-      id: 4,
-      title: "Ethereal Sky Penthouse",
-      location: "Token Heights, Ethereum City",
-      price: "$2,950,000",
-      cryptoPrice: "106.8 ETH",
-      imageUrl: "https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1470&q=80",
-      sqft: 2300,
-      featured: false
+  const [properties, setProperties] = useState<PropertyDto[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchFeatured = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        // TODO: Ideally, backend should have a dedicated /properties/featured endpoint
+        // For now, fetch all and take the first few (or filter if DTO includes a featured flag)
+        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+        const response = await fetch(`${apiUrl}/properties`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const allProperties: PropertyDto[] = await response.json();
+        
+        // Placeholder logic: Take first 4 properties as "featured"
+        setProperties(allProperties.slice(0, 4)); 
+
+      } catch (err: any) {
+        console.error("Failed to fetch featured properties:", err);
+        setError(err.message || 'Failed to load featured properties.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchFeatured();
+  }, []);
+
+  const renderProperties = () => {
+     if (isLoading) {
+      return (
+        <div className="flex justify-center items-center py-10 col-span-full">
+          <Loader2 className="h-8 w-8 animate-spin text-crypto-light" />
+          <p className="ml-3 text-gray-400">Loading Featured...</p>
+        </div>
+      );
     }
-  ];
+
+    if (error) {
+      return (
+        <div className="text-center py-10 text-red-500 col-span-full">
+          <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
+          <p>Error: {error}</p>
+        </div>
+      );
+    }
+    
+    if (properties.length === 0) {
+       return <p className="text-gray-400 col-span-full text-center py-10">No featured properties available.</p>;
+    }
+
+    return properties.map(property => (
+      <PropertyCard 
+        key={property.nftAddress}
+        id={property.tokenId} 
+        nftAddress={property.nftAddress}
+        title={property.metadata?.name || 'Unnamed Property'}
+        location={property.propertyDetails.physicalAddress}
+        // Price currently not available directly in PropertyDto for this general view
+        imageUrl={property.metadata?.image || ''}
+        sqft={property.propertyDetails.sqft}
+        // featured={property.isFeatured} // Uncomment if backend adds this flag
+      />
+    ));
+  }
 
   return (
     <section className="py-20 px-6">
@@ -56,7 +85,8 @@ const FeaturedProperties = () => {
             <h2 className="text-3xl font-bold mb-2">Featured <span className="text-gradient">Properties</span></h2>
             <p className="text-gray-400">Discover our selection of premium digital real estate</p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-4">
+          {/* Filter/Sort buttons might not be needed for a small featured section */}
+          {/* <div className="flex flex-col sm:flex-row gap-4">
             <Button variant="outline" className="border-crypto-light/30 text-crypto-light">
               <Filter className="mr-2 h-4 w-4" />
               Filter
@@ -65,13 +95,11 @@ const FeaturedProperties = () => {
               <ArrowDownAZ className="mr-2 h-4 w-4" />
               Sort By
             </Button>
-          </div>
+          </div> */}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {properties.map(property => (
-            <PropertyCard key={property.id} {...property} />
-          ))}
+          {renderProperties()}
         </div>
 
         <div className="flex justify-center mt-12">
