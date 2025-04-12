@@ -1,43 +1,66 @@
 'use client'; // Needs client hooks
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Filter, ArrowDownAZ, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import PropertyCard from './PropertyCard';
 import { PropertyDto } from '@/types/dtos';
 
+// Cache for featured properties
+let propertiesCache: PropertyDto[] | null = null;
+let lastFetchTime = 0;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
+
 const FeaturedProperties = () => {
   const [properties, setProperties] = useState<PropertyDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchFeatured = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        // TODO: Ideally, backend should have a dedicated /properties/featured endpoint
-        // For now, fetch all and take the first few (or filter if DTO includes a featured flag)
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
-        const response = await fetch(`${apiUrl}/properties`);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const allProperties: PropertyDto[] = await response.json();
-        
-        // Placeholder logic: Take first 4 properties as "featured"
-        setProperties(allProperties.slice(0, 4)); 
-
-      } catch (err: any) {
-        console.error("Failed to fetch featured properties:", err);
-        setError(err.message || 'Failed to load featured properties.');
-      } finally {
-        setIsLoading(false);
+  const fetchFeatured = useCallback(async () => {
+    const now = Date.now();
+    
+    // Return cached data if available and not expired
+    if (propertiesCache && (now - lastFetchTime < CACHE_TTL)) {
+      setProperties(propertiesCache);
+      setIsLoading(false);
+      return;
+    }
+    
+    setIsLoading(true);
+    setError(null);
+    try {
+      // TODO: Ideally, backend should have a dedicated /properties/featured endpoint
+      // For now, fetch all and take the first few (or filter if DTO includes a featured flag)
+      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+      const response = await fetch(`${apiUrl}/properties`, {
+        next: { revalidate: 300 } // Revalidate cache every 5 minutes
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-    };
-    fetchFeatured();
+      const allProperties: PropertyDto[] = await response.json();
+      
+      // Placeholder logic: Take first 4 properties as "featured"
+      const featuredProps = allProperties.slice(0, 4);
+      
+      // Update cache
+      propertiesCache = featuredProps;
+      lastFetchTime = now;
+      
+      setProperties(featuredProps); 
+
+    } catch (err: any) {
+      console.error("Failed to fetch featured properties:", err);
+      setError(err.message || 'Failed to load featured properties.');
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchFeatured();
+  }, [fetchFeatured]);
 
   const renderProperties = () => {
      if (isLoading) {

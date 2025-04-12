@@ -1,27 +1,37 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Building2, MapPin, Maximize2, Bitcoin, Tag, Info } from "lucide-react";
+import { Building2, MapPin, Maximize2, Bitcoin, Tag, Info, AlertTriangle } from "lucide-react";
+
+// Sample image URL for fallback when images fail to load
+const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1560518883-ce09059eeffa?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8cHJvcGVydHl8ZW58MHx8MHx8&auto=format&fit=crop&w=800&q=60";
 
 // Helper to convert IPFS URL to HTTP Gateway URL
 const ipfsToGatewayUrl = (ipfsUrl: string): string => {
-  if (!ipfsUrl || !ipfsUrl.startsWith('ipfs://')) {
-    return ipfsUrl; // Return original if not a valid IPFS URL
+  if (!ipfsUrl || typeof ipfsUrl !== 'string') {
+    return FALLBACK_IMAGE; // Return fallback for undefined/null or non-string values
   }
-  // Using ipfs.io public gateway
+  
+  if (!ipfsUrl.startsWith('ipfs://')) {
+    // It's already an HTTP URL or another format
+    return ipfsUrl;
+  }
+  
+  // Use gateway.pinata.cloud which is faster than ipfs.io
   const cid = ipfsUrl.replace('ipfs://', '');
-  return `https://ipfs.io/ipfs/${cid}`;
+  return `https://gateway.pinata.cloud/ipfs/${cid}`;
 };
 
+// Update the interface to handle both old and new property formats
 interface PropertyCardProps {
   id: number; // This represents tokenId from backend DTO
-  nftAddress?: string; // Add nftAddress if available from the source
+  nftAddress?: string; // Property NFT address (for linking)
   title: string;
   location: string;
-  price?: string; // Make optional
-  cryptoPrice?: string; // Make optional
+  price?: string;
+  cryptoPrice?: string;
   imageUrl: string;
   sqft: number;
   featured?: boolean;
@@ -40,6 +50,31 @@ const PropertyCard = ({
 }: PropertyCardProps) => {
 
   const httpImageUrl = ipfsToGatewayUrl(imageUrl); // Convert IPFS URL
+  const [imgSrc, setImgSrc] = useState(httpImageUrl);
+  const [imgError, setImgError] = useState(false);
+  const [addressError, setAddressError] = useState(false);
+  
+  // Reset error state when imageUrl or nftAddress changes
+  useEffect(() => {
+    setImgSrc(ipfsToGatewayUrl(imageUrl));
+    setImgError(false);
+    setAddressError(!nftAddress);
+  }, [imageUrl, nftAddress]);
+  
+  const handleImageError = () => {
+    // First try IPFS.io if primary gateway fails
+    if (imageUrl?.startsWith('ipfs://') && !imgError) {
+      const cid = imageUrl.replace('ipfs://', '');
+      setImgSrc(`https://ipfs.io/ipfs/${cid}`);
+      setImgError(true);
+      return;
+    }
+    
+    // If all else fails, use a fallback image
+    if (imgError) {
+      setImgSrc(FALLBACK_IMAGE);
+    }
+  };
 
   const renderPriceSection = () => {
     if (price && cryptoPrice) {
@@ -62,20 +97,36 @@ const PropertyCard = ({
     }
   };
 
+  // Ensure the NFT address is valid and normalize it
+  const validNftAddress = nftAddress && nftAddress.startsWith('0x') ? nftAddress : undefined;
+
   // Determine the link destination
-  const linkHref = nftAddress ? `/properties/${nftAddress}` : '#'; // Link to address if available
+  const linkHref = validNftAddress ? `/properties/${validNftAddress}` : '#'; // Link to address if available
+
+  // Function to handle click on disabled cards
+  const handleDisabledClick = (e: React.MouseEvent) => {
+    if (!validNftAddress) {
+      e.preventDefault();
+      // Optional: Could add a toast notification here
+      console.warn('Cannot view property: NFT address is missing or invalid');
+      setAddressError(true);
+    }
+  };
 
   return (
     <Card className={`overflow-hidden card-hover glass-card border-0 ${featured ? 'border-l-4 border-l-crypto-teal' : ''}`}>
       <div className="relative">
         <div className="aspect-[4/3] overflow-hidden relative">
-          {httpImageUrl ? (
+          {imgSrc ? (
             <Image 
-              src={httpImageUrl}
+              src={imgSrc}
               alt={title}
               className="transition-transform duration-500 hover:scale-110 object-cover"
               fill
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+              onError={handleImageError}
+              loading="lazy" // Add lazy loading 
+              priority={featured} // Prioritize loading of featured properties
             />
           ) : (
             <div className="w-full h-full bg-gray-700/50 flex items-center justify-center text-gray-400">No Image</div>
@@ -109,10 +160,16 @@ const PropertyCard = ({
       </CardContent>
 
       <CardFooter className="pt-0">
-        <Link href={linkHref} className={`w-full ${!nftAddress ? 'pointer-events-none' : ''}`}> 
+        {addressError && (
+          <div className="text-xs text-yellow-400 mb-2 flex items-center">
+            <AlertTriangle className="h-3 w-3 mr-1" />
+            <span>Invalid property address</span>
+          </div>
+        )}
+        <Link href={linkHref} className={`w-full ${!validNftAddress ? 'pointer-events-none opacity-70' : ''}`} onClick={handleDisabledClick}> 
           <Button 
             className="w-full bg-crypto-dark hover:bg-crypto-dark/80 border border-crypto-light/30 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={!nftAddress} // Disable button if no address
+            disabled={!validNftAddress} // Disable button if no address
            > 
             <Tag className="mr-2 h-4 w-4" />
             View Property
