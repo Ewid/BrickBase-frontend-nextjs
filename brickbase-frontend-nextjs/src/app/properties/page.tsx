@@ -37,6 +37,20 @@ const MOCK_PROPERTIES: PropertyDto[] = [
       ]
     },
     totalSupply: '10000000000000000000000'
+  },
+  {
+    id: '0x1330a7aE207a0A8585e6c6ef543b4Ef59568c4b9', // Different ID
+    tokenId: 3,
+    metadata: {
+      name: 'BrickBase Property #2 - 3 Property Lane',
+      description: 'A modern luxury property with ocean views.',
+      image: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=2070',
+      attributes: [
+        { trait_type: 'Address', value: '3 Property Lane' },
+        { trait_type: 'Square Footage', value: 1800 }
+      ]
+    },
+    totalSupply: '10000000000000000000000'
   }
 ];
 
@@ -68,7 +82,18 @@ const PropertiesPage = () => {
           setUseMockData(true);
           setProperties(MOCK_PROPERTIES);
         } else {
-          setProperties(data);
+          // De-duplicate properties by ID to avoid React key conflicts
+          const uniquePropertiesMap = new Map<string, PropertyDto>();
+          data.forEach(property => {
+            if (property.id) {
+              uniquePropertiesMap.set(property.id, property);
+            }
+          });
+          
+          const uniqueProperties = Array.from(uniquePropertiesMap.values());
+          console.log(`De-duplicated ${data.length} properties to ${uniqueProperties.length} unique properties`);
+          
+          setProperties(uniqueProperties);
         }
       } catch (err: any) {
         console.error("Failed to fetch properties:", err);
@@ -137,15 +162,18 @@ const PropertiesPage = () => {
           </div>
         )}
         
-        {properties.map(property => {
+        {properties.map((property, index) => {
           // Extract details from property metadata
           const metadata = property.metadata;
           const sqft = getAttributeValue(metadata?.attributes, 'Square Footage', 0);
           const address = getAttributeValue(metadata?.attributes, 'Address', 'No address available');
           
+          // Create a unique key combining the property id, token id and index
+          const uniqueKey = `${property.id}-${property.tokenId || 0}-${index}`;
+          
           return (
             <PropertyCard
-              key={property.id}
+              key={uniqueKey}
               id={property.tokenId || 0}
               nftAddress={property.id} // Use property.id (address) for the link
               title={metadata?.name || 'Unnamed Property'}
