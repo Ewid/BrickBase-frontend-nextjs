@@ -5,14 +5,46 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import PropertyCard from '@/components/PropertyCard';
-import { Filter, ArrowDownAZ, Loader2 } from 'lucide-react';
+import { Filter, ArrowDownAZ, Loader2, AlertTriangle } from 'lucide-react';
 import { PropertyDto } from '@/types/dtos'; // Import DTO type
-import { formatUnits } from 'ethers'; // For potential formatting later
+
+// Mock data for when the API fails
+const MOCK_PROPERTIES: PropertyDto[] = [
+  {
+    id: '0xda988e1D11748E6589ac8a256A6cb61A3dd4F9D2',
+    tokenId: 1,
+    metadata: {
+      name: 'BrickBase Property #0 - 1 Property Lane',
+      description: 'A lovely residential property managed by BrickBase.',
+      image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=2070',
+      attributes: [
+        { trait_type: 'Address', value: '1 Property Lane' },
+        { trait_type: 'Square Footage', value: 1000 }
+      ]
+    },
+    totalSupply: '10000000000000000000000'
+  },
+  {
+    id: '0xC072f717869bb13c04d4C76E933a66b4c0d47FE0',
+    tokenId: 2,
+    metadata: {
+      name: 'BrickBase Property #1 - 2 Property Lane',
+      description: 'A lovely residential property managed by BrickBase.',
+      image: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?q=80&w=2053',
+      attributes: [
+        { trait_type: 'Address', value: '2 Property Lane' },
+        { trait_type: 'Square Footage', value: 1200 }
+      ]
+    },
+    totalSupply: '10000000000000000000000'
+  }
+];
 
 const PropertiesPage = () => {
   const [properties, setProperties] = useState<PropertyDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [useMockData, setUseMockData] = useState(false);
 
   useEffect(() => {
     const fetchProperties = async () => {
@@ -20,15 +52,30 @@ const PropertiesPage = () => {
       setError(null);
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
-        const response = await fetch(`${apiUrl}/properties`);
+        const response = await fetch(`${apiUrl}/properties`, {
+          signal: AbortSignal.timeout(8000) // Timeout after 8 seconds
+        });
+        
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
+        
         const data: PropertyDto[] = await response.json();
-        setProperties(data);
+        console.log("API returned properties:", data);
+        
+        if (data.length === 0) {
+          // If no properties returned, use mock data
+          setUseMockData(true);
+          setProperties(MOCK_PROPERTIES);
+        } else {
+          setProperties(data);
+        }
       } catch (err: any) {
         console.error("Failed to fetch properties:", err);
         setError(err.message || 'Failed to load properties.');
+        // Fall back to mock data
+        setUseMockData(true);
+        setProperties(MOCK_PROPERTIES);
       } finally {
         setIsLoading(false);
       }
@@ -41,6 +88,13 @@ const PropertiesPage = () => {
   const [filter, setFilter] = useState({});
   const [sortBy, setSortBy] = useState('default');
 
+  // Helper function to extract attribute values
+  const getAttributeValue = (attributes: any[] | undefined, traitType: string, defaultValue: any) => {
+    if (!attributes) return defaultValue;
+    const attr = attributes.find(attr => attr.trait_type === traitType);
+    return attr ? attr.value : defaultValue;
+  };
+
   // --- Render Logic ---
   const renderContent = () => {
     if (isLoading) {
@@ -52,10 +106,16 @@ const PropertiesPage = () => {
       );
     }
 
-    if (error) {
+    if (error && !useMockData) {
       return (
         <div className="text-center py-20 text-red-500">
           <p>Error loading properties: {error}</p>
+          <Button 
+            variant="outline" 
+            className="mt-4 border-crypto-light/30 text-crypto-light"
+            onClick={() => setUseMockData(true)}>
+            View Demo Data
+          </Button>
         </div>
       );
     }
@@ -68,26 +128,34 @@ const PropertiesPage = () => {
       );
     }
 
-    // TODO: Implement actual filtering and sorting based on state
-    const displayedProperties = properties;
-
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {displayedProperties.map(property => (
-          // Map PropertyDto to PropertyCardProps
-          <PropertyCard
-            key={property.tokenId} // Use tokenId as key
-            id={property.tokenId} // Pass tokenId
-            nftAddress={property.nftAddress} // Pass nftAddress for the link
-            title={property.metadata?.name || 'Unnamed Property'} // Use metadata name if available
-            location={property.metadata?.attributes?.find((attr: any) => attr.trait_type === 'Address')?.value || 'N/A'} // Get address from attributes
-            // Price props removed as they are not directly in PropertyDto
-            imageUrl={property.metadata?.image || ''} // Use metadata image
-            sqft={property.metadata?.attributes?.find((attr: any) => attr.trait_type === 'Square Footage')?.value || 0} // Get sqft from attributes
-            // featured status might need to come from backend or be determined differently
-            featured={false}
-          />
-        ))}
+        {useMockData && (
+          <div className="col-span-full mb-4 py-2 px-4 bg-yellow-500/20 text-yellow-300 rounded-md text-sm flex items-center">
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            <p>Using demo data. Connect your backend API to see real properties.</p>
+          </div>
+        )}
+        
+        {properties.map(property => {
+          // Extract details from property metadata
+          const metadata = property.metadata;
+          const sqft = getAttributeValue(metadata?.attributes, 'Square Footage', 0);
+          const address = getAttributeValue(metadata?.attributes, 'Address', 'No address available');
+          
+          return (
+            <PropertyCard
+              key={property.id}
+              id={property.tokenId || 0}
+              nftAddress={property.id} // Use property.id (address) for the link
+              title={metadata?.name || 'Unnamed Property'}
+              location={address}
+              imageUrl={metadata?.image || ''}
+              sqft={sqft}
+              featured={false}
+            />
+          );
+        })}
       </div>
     );
   }
@@ -102,7 +170,6 @@ const PropertiesPage = () => {
             <p className="text-gray-400">Find your next digital real estate investment</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-4">
-            {/* TODO: Implement filter/sort functionality */}
             <Button variant="outline" className="border-crypto-light/30 text-crypto-light">
               <Filter className="mr-2 h-4 w-4" />
               Filter
@@ -115,9 +182,6 @@ const PropertiesPage = () => {
         </div>
 
         {renderContent()}
-        
-        {/* Add pagination controls here if needed */}
-        
       </main>
       <Footer />
     </div>

@@ -4,16 +4,15 @@
 // --- Marketplace DTOs ---
 
 export interface ListingDto {
-  id: number; // Corresponds to listing index in contract array
+  listingId: number; 
   nftAddress: string;
-  tokenId: number; // Note: Backend determines this, might be 0 if multiple NFTs share token
+  tokenId: string; // Changed from number to string to match backend data
   seller: string;
-  propertyTokenAddress: string;
+  tokenAddress: string; // Changed from propertyTokenAddress to match backend
   amount: string; // Use string for BigInt representation
   pricePerToken: string; // Use string for BigInt representation
-  isActive: boolean;
-  createdAt: Date;
-  // Add other fields from backend entity if needed
+  active: boolean; // Changed from isActive to match backend
+  createdAt?: Date; // Made optional as it's not in the backend response
 }
 
 export interface PriceHistoryDto {
@@ -31,21 +30,29 @@ export interface PriceHistoryDto {
 // --- Properties DTOs ---
 
 export interface PropertyDto {
-  nftAddress: string;
+  id: string; // Changed from nftAddress to id to match backend data
   tokenId: number;
-  tokenUri: string;
-  owner: string; // Owner of the NFT (contract likely)
-  propertyDetails: {
+  metadata: {
+    name: string;
+    description: string;
+    image: string;
+    attributes: Array<{
+      trait_type: string;
+      value: any;
+    }>;
+  };
+  totalSupply?: string; // Added as it's in the backend response
+  tokenUri?: string; // Made optional as it's not in the backend response
+  owner?: string; // Made optional as it's not in the backend response
+  propertyDetails?: {
     physicalAddress: string;
     sqft: number;
     bedrooms: number;
     bathrooms: number;
     yearBuilt: number;
-    propertyType: string; // e.g., "Residential", "Commercial"
-    associatedPropertyToken: string; // Address of the ERC20 token
+    propertyType: string;
+    associatedPropertyToken: string;
   };
-  metadata?: Record<string, any>; // To store fetched IPFS metadata
-  // Add other fields from backend entity if needed
 }
 
 // --- DAO DTOs ---
