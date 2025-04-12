@@ -5,6 +5,16 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button";
 import { Building2, MapPin, Maximize2, Bitcoin, Tag, Info } from "lucide-react";
 
+// Helper to convert IPFS URL to HTTP Gateway URL
+const ipfsToGatewayUrl = (ipfsUrl: string): string => {
+  if (!ipfsUrl || !ipfsUrl.startsWith('ipfs://')) {
+    return ipfsUrl; // Return original if not a valid IPFS URL
+  }
+  // Using ipfs.io public gateway
+  const cid = ipfsUrl.replace('ipfs://', '');
+  return `https://ipfs.io/ipfs/${cid}`;
+};
+
 interface PropertyCardProps {
   id: number; // This represents tokenId from backend DTO
   nftAddress?: string; // Add nftAddress if available from the source
@@ -28,6 +38,8 @@ const PropertyCard = ({
   sqft, 
   featured = false 
 }: PropertyCardProps) => {
+
+  const httpImageUrl = ipfsToGatewayUrl(imageUrl); // Convert IPFS URL
 
   const renderPriceSection = () => {
     if (price && cryptoPrice) {
@@ -57,9 +69,9 @@ const PropertyCard = ({
     <Card className={`overflow-hidden card-hover glass-card border-0 ${featured ? 'border-l-4 border-l-crypto-teal' : ''}`}>
       <div className="relative">
         <div className="aspect-[4/3] overflow-hidden relative">
-          {imageUrl ? (
+          {httpImageUrl ? (
             <Image 
-              src={imageUrl} 
+              src={httpImageUrl}
               alt={title}
               className="transition-transform duration-500 hover:scale-110 object-cover"
               fill

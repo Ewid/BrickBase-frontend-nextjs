@@ -63,15 +63,14 @@ const FeaturedProperties = () => {
     }
 
     return properties.map(property => (
-      <PropertyCard 
-        key={property.nftAddress}
-        id={property.tokenId} 
+      <PropertyCard
+        key={property.tokenId}
+        id={property.tokenId}
         nftAddress={property.nftAddress}
         title={property.metadata?.name || 'Unnamed Property'}
-        location={property.propertyDetails.physicalAddress}
-        // Price currently not available directly in PropertyDto for this general view
+        location={property.metadata?.attributes?.find((attr: any) => attr.trait_type === 'Address')?.value || 'N/A'}
         imageUrl={property.metadata?.image || ''}
-        sqft={property.propertyDetails.sqft}
+        sqft={property.metadata?.attributes?.find((attr: any) => attr.trait_type === 'Square Footage')?.value || 0}
         // featured={property.isFeatured} // Uncomment if backend adds this flag
       />
     ));
