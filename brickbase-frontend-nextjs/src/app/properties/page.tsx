@@ -75,17 +75,17 @@ const PropertiesPage = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {displayedProperties.map(property => (
           // Map PropertyDto to PropertyCardProps
-          <PropertyCard 
-            key={property.nftAddress} // Use nftAddress as key
-            id={property.tokenId} // Pass tokenId 
+          <PropertyCard
+            key={property.tokenId} // Use tokenId as key
+            id={property.tokenId} // Pass tokenId
             nftAddress={property.nftAddress} // Pass nftAddress for the link
             title={property.metadata?.name || 'Unnamed Property'} // Use metadata name if available
-            location={property.propertyDetails.physicalAddress}
+            location={property.metadata?.attributes?.find((attr: any) => attr.trait_type === 'Address')?.value || 'N/A'} // Get address from attributes
             // Price props removed as they are not directly in PropertyDto
             imageUrl={property.metadata?.image || ''} // Use metadata image
-            sqft={property.propertyDetails.sqft}
+            sqft={property.metadata?.attributes?.find((attr: any) => attr.trait_type === 'Square Footage')?.value || 0} // Get sqft from attributes
             // featured status might need to come from backend or be determined differently
-            featured={false} 
+            featured={false}
           />
         ))}
       </div>
