@@ -105,6 +105,53 @@ export const getActiveListings = async () => {
   }
 };
 
+// Approve tokens for marketplace transfer (separate step)
+export const approveTokens = async (propertyToken: string, tokenAmount: string) => {
+  try {
+    if (!window.ethereum) {
+      throw new Error('No ethereum provider available');
+    }
+    
+    // Cast window.ethereum to any to avoid type issues
+    const provider = new ethers.BrowserProvider(window.ethereum as any);
+    const signer = await provider.getSigner();
+    
+    // Get token contract for the property
+    const tokenContract = await getTokenContract(propertyToken, signer);
+    const marketplaceAddress = CONTRACT_CONFIG.PROPERTY_MARKETPLACE_ADDRESS;
+    
+    // Approve the marketplace to transfer tokens
+    const approveTx = await tokenContract.approve(marketplaceAddress, tokenAmount);
+    const receipt = await approveTx.wait();
+    
+    return {
+      success: true,
+      transaction: approveTx,
+      receipt: receipt
+    };
+  } catch (error: any) {
+    console.error('Failed to approve tokens:', error);
+    
+    // Handle specific errors
+    let errorMessage = 'Failed to approve tokens';
+    let errorCode = 'APPROVAL_FAILED';
+    
+    if (error.code === 'ACTION_REJECTED') {
+      errorMessage = 'Transaction was rejected by the user';
+      errorCode = 'USER_REJECTED';
+    }
+    
+    return {
+      success: false,
+      error: {
+        code: errorCode,
+        message: errorMessage,
+        originalError: error
+      }
+    };
+  }
+};
+
 // Create a new listing with USDC price
 export const createListing = async (propertyToken: string, tokenAmount: string, usdcPrice: string) => {
   try {
@@ -119,14 +166,7 @@ export const createListing = async (propertyToken: string, tokenAmount: string, 
     const provider = new ethers.BrowserProvider(window.ethereum as any);
     const signer = await provider.getSigner();
     
-    // First approve the marketplace to transfer tokens
-    const tokenContract = await getTokenContract(propertyToken, signer);
-    const marketplaceAddress = CONTRACT_CONFIG.PROPERTY_MARKETPLACE_ADDRESS;
-    
-    const approveTx = await tokenContract.approve(marketplaceAddress, tokenAmount);
-    await approveTx.wait();
-    
-    // Create the listing with USDC price
+    // Create the listing (assuming tokens are already approved)
     const contract = await getMarketplaceContract(signer);
     const tx = await contract.createListing(propertyToken, tokenAmount, priceInWei);
     const receipt = await tx.wait();
