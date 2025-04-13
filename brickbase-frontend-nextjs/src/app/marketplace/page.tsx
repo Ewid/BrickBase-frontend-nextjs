@@ -548,30 +548,6 @@ export default function MarketplacePage() {
                 <span className="text-green-400">1 ETH = ${ethUsdPrice}</span>
               </div>
             )}
-            
-            {!isConnected ? (
-              <Button 
-                variant="outline" 
-                className="border-crypto-light/30 text-crypto-light"
-                onClick={connectWallet}
-              >
-                Connect Wallet
-              </Button>
-            ) : (
-              <div className="text-sm bg-crypto-dark/50 px-4 py-2 rounded-md border border-crypto-light/30">
-                <span className="text-gray-400 mr-2">Connected:</span>
-                <span className="text-crypto-light">{account?.slice(0, 6)}...{account?.slice(-4)}</span>
-              </div>
-            )}
-            
-            <Button 
-              variant="outline" 
-              className="border-crypto-light/30 text-crypto-light"
-              onClick={handleRefresh}
-              disabled={isLoading}
-            >
-              Refresh
-            </Button>
           </div>
         </div>
         
