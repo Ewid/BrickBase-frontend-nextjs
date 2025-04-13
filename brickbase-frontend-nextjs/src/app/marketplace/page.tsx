@@ -298,11 +298,20 @@ export default function MarketplacePage() {
           
           // Extract property details
           const attributes = isPropertyDataValid ? propertyData.metadata?.attributes : null;
-          const location = getAttributeValue(attributes, 'location', 'Location not specified');
-          const sqft = getAttributeValue(attributes, 'sqft', 0);
-          const bedrooms = getAttributeValue(attributes, 'bedrooms', 0);
-          const bathrooms = getAttributeValue(attributes, 'bathrooms', 0);
-          const propertyType = getAttributeValue(attributes, 'propertyType', 'Not specified');
+          
+          // Look for both "location" and "Address" trait types for location information
+          const location = getAttributeValue(attributes, 'Address', '') || 
+                          getAttributeValue(attributes, 'address', '') || 
+                          getAttributeValue(attributes, 'location', 'Location not specified');
+          
+          const sqft = getAttributeValue(attributes, 'Square Footage', 0) || 
+                     getAttributeValue(attributes, 'sqft', 0);
+          const bedrooms = getAttributeValue(attributes, 'bedrooms', 0) || 
+                         getAttributeValue(attributes, 'Bedrooms', 0);
+          const bathrooms = getAttributeValue(attributes, 'bathrooms', 0) || 
+                          getAttributeValue(attributes, 'Bathrooms', 0);
+          const propertyType = getAttributeValue(attributes, 'Property Type', '') || 
+                             getAttributeValue(attributes, 'propertyType', 'Not specified');
           
           return (
             <Card key={listing.listingId} className="overflow-hidden h-full flex flex-col border-gray-800 hover:border-gray-700 transition-colors">

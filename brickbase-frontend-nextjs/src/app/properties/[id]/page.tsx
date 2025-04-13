@@ -96,7 +96,7 @@ const PropertyDetailPage = () => {
         console.log(`Fetching property: ${apiUrl}/properties/${addressToUse}`);
         
         const response = await fetch(`${apiUrl}/properties/${addressToUse}`, {
-          signal: AbortSignal.timeout(8000) // 8 second timeout
+          signal: AbortSignal.timeout(30000) // 30 second timeout
         });
         
         if (response.status === 404) {
@@ -214,22 +214,54 @@ const PropertyDetailPage = () => {
   
   // Extract attributes from metadata if available
   const getAttributeValue = (traitType: string, defaultValue: any) => {
-    const attr = property.metadata?.attributes?.find(
+    // Handle case-insensitive matching and multiple possible trait names
+    if (!property.metadata?.attributes) return defaultValue;
+    
+    // Try exact match first
+    const exactMatch = property.metadata.attributes.find(
       (attr: any) => attr.trait_type === traitType
     );
-    return attr ? attr.value : defaultValue;
+    if (exactMatch) return exactMatch.value;
+    
+    // Try alternative namings (add common alternative trait names here)
+    const alternatives: Record<string, string[]> = {
+      'Address': ['address', 'location', 'property_address'],
+      'Square Footage': ['sqft', 'square_feet', 'area'],
+      'Bedrooms': ['beds', 'bedroom', 'bed_count'],
+      'Bathrooms': ['baths', 'bathroom', 'bath_count'],
+      'Year Built': ['yearBuilt', 'year_constructed', 'construction_year'],
+      'Property Type': ['propertyType', 'property_category', 'type']
+    };
+    
+    // Check for alternatives
+    const altNames = alternatives[traitType] || [];
+    for (const altName of altNames) {
+      const altMatch = property.metadata.attributes.find(
+        (attr: any) => attr.trait_type === altName
+      );
+      if (altMatch) return altMatch.value;
+    }
+    
+    // Try case-insensitive as last resort
+    const caseInsensitiveMatch = property.metadata.attributes.find(
+      (attr: any) => attr.trait_type && attr.trait_type.toLowerCase() === traitType.toLowerCase()
+    );
+    
+    return caseInsensitiveMatch ? caseInsensitiveMatch.value : defaultValue;
   };
   
   // Safely access property details with fallbacks
   const propertyDetails = property.propertyDetails || DEFAULT_PROPERTY_DETAILS;
-  const address = propertyDetails.physicalAddress || getAttributeValue('Address', 'Address not available');
   
-  // Try to get values from property details first, then from metadata attributes as fallback
-  const sqft = propertyDetails.sqft || getAttributeValue('Square Footage', 0);
-  const bedrooms = propertyDetails.bedrooms || getAttributeValue('Bedrooms', 0);
-  const bathrooms = propertyDetails.bathrooms || getAttributeValue('Bathrooms', 0);
-  const yearBuilt = propertyDetails.yearBuilt || getAttributeValue('Year Built', 0);
-  const propertyType = propertyDetails.propertyType || getAttributeValue('Property Type', 'Unknown');
+  // First try to get address from metadata's "Address" attribute, then fall back to physical address
+  const address = getAttributeValue('Address', '') || propertyDetails.physicalAddress || 'Address not available';
+  
+  // Try to get values from metadata attributes first, then from property details as fallback
+  const sqft = getAttributeValue('Square Footage', propertyDetails.sqft || 0);
+  const bedrooms = getAttributeValue('Bedrooms', propertyDetails.bedrooms || 0);
+  const bathrooms = getAttributeValue('Bathrooms', propertyDetails.bathrooms || 0);
+  const yearBuilt = getAttributeValue('Year Built', propertyDetails.yearBuilt || 0);
+  const propertyType = getAttributeValue('Property Type', propertyDetails.propertyType || 'Unknown');
   const tokenAddress = propertyDetails.associatedPropertyToken || getAttributeValue('Token Address', 'Not available');
   
   // Get formatted address for display
