@@ -4,13 +4,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Check, AlertCircle, Loader2, Info, DollarSign } from 'lucide-react';
-import { buyTokensFromListing, formatCurrency } from '@/services/marketplace';
+import { buyTokensFromListing, formatCurrency, getUsdcBalance } from '@/services/marketplace';
 import { ListingDto } from '@/types/dtos';
 import { ethers } from 'ethers';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface BuyTokensFormProps {
-  listing: any; // Support both ListingDto and enhanced listing with ethUsdPrice
+  listing: any; // Support both ListingDto and enhanced listing
   onSuccess?: () => void;
   onError?: (error: any) => void;
 }
@@ -22,21 +22,48 @@ const BuyTokensForm = ({ listing, onSuccess, onError }: BuyTokensFormProps) => {
   const [success, setSuccess] = useState(false);
   const [inputValid, setInputValid] = useState(true);
   const [estimatedGasError, setEstimatedGasError] = useState<string | null>(null);
+  const [usdcBalance, setUsdcBalance] = useState<string>('0');
+  const [isLoadingUsdcBalance, setIsLoadingUsdcBalance] = useState(false);
+  
+  // Get USDC price per token
+  const usdcPricePerToken = listing.formattedPrice || formatCurrency(listing.pricePerToken, 6);
   
   // Convert user-friendly amount to actual token amount (with 18 decimals)
   const actualAmount = userFriendlyAmount && inputValid
     ? ethers.parseUnits(userFriendlyAmount, 18).toString()
     : '0';
   
-  // Calculate the total price based on amount
-  const totalPrice = userFriendlyAmount && inputValid
-    ? formatCurrency((BigInt(actualAmount) * BigInt(listing.pricePerToken) / BigInt(10**18)).toString()) 
-    : '0';
+  // Calculate the total in USDC (assuming price is in USDC with 6 decimals)
+  const totalUsdc = userFriendlyAmount && inputValid
+    ? (parseFloat(userFriendlyAmount) * parseFloat(usdcPricePerToken)).toFixed(2)
+    : '0.00';
+  
+  // Load USDC balance when the form loads
+  useEffect(() => {
+    const loadUsdcBalance = async () => {
+      if (typeof window === 'undefined' || !window.ethereum) return;
+      
+      try {
+        setIsLoadingUsdcBalance(true);
+        
+        // Connect to the wallet
+        const provider = new ethers.BrowserProvider(window.ethereum as any);
+        const accounts = await provider.listAccounts();
+        
+        if (accounts.length > 0) {
+          const account = accounts[0].address;
+          const balance = await getUsdcBalance(account);
+          setUsdcBalance(balance);
+        }
+      } catch (err) {
+        console.error('Failed to load USDC balance:', err);
+      } finally {
+        setIsLoadingUsdcBalance(false);
+      }
+    };
     
-  // Calculate USD value if ethUsdPrice is available
-  const usdValue = (listing.ethUsdPrice && userFriendlyAmount && inputValid)
-    ? (parseFloat(totalPrice) * listing.ethUsdPrice).toFixed(2)
-    : undefined;
+    loadUsdcBalance();
+  }, []);
   
   // Validate input when it changes
   useEffect(() => {
@@ -92,8 +119,8 @@ const BuyTokensForm = ({ listing, onSuccess, onError }: BuyTokensFormProps) => {
         if (onSuccess) onSuccess();
       } else {
         // Handle specific blockchain errors
-        if (result.error?.code === 'CALL_EXCEPTION' || result.error?.message?.includes('estimateGas')) {
-          setEstimatedGasError('Transaction would fail. You may have insufficient funds or the contract rejected the transaction.');
+        if (result.error?.code === 'CALL_EXCEPTION') {
+          setEstimatedGasError('Transaction would fail. You may have insufficient USDC or the contract rejected the transaction.');
         }
         
         setError(result.error?.message || 'Failed to complete purchase');
@@ -102,8 +129,8 @@ const BuyTokensForm = ({ listing, onSuccess, onError }: BuyTokensFormProps) => {
     } catch (err: any) {
       if (err.message?.includes('user rejected transaction')) {
         setError('Transaction was cancelled by user');
-      } else if (err.message?.includes('insufficient funds')) {
-        setError('Insufficient ETH balance to complete this transaction');
+      } else if (err.message?.includes('insufficient funds') || err.message?.includes('exceed allowance')) {
+        setError('Insufficient USDC balance to complete this transaction');
       } else {
         setError(err.message || 'An unexpected error occurred');
       }
@@ -241,21 +268,46 @@ const BuyTokensForm = ({ listing, onSuccess, onError }: BuyTokensFormProps) => {
       <div className="bg-gray-800/50 p-3 rounded-md">
         <div className="flex justify-between items-center">
           <span className="text-gray-300">Price per token:</span>
-          <span>{formatCurrency(listing.pricePerToken)} ETH</span>
+          <div className="text-right flex items-center">
+            <DollarSign className="h-3.5 w-3.5 mr-0.5 text-green-400" />
+            <span className="font-bold text-green-400">${usdcPricePerToken} USDC</span>
+          </div>
         </div>
-        <div className="flex justify-between items-center mt-1">
-          <span className="text-gray-300">Total price:</span>
-          <div className="text-right">
-            <span className="font-bold">{totalPrice} ETH</span>
-            {usdValue && (
-              <div className="text-xs text-gray-400 flex items-center justify-end mt-0.5">
-                <DollarSign className="h-3 w-3 mr-0.5" />
-                <span>${usdValue} USD</span>
-              </div>
-            )}
+        
+        <div className="border-t border-gray-700 my-2"></div>
+        
+        <div className="flex justify-between items-center">
+          <span className="text-gray-300">Total cost:</span>
+          <div className="text-right flex items-center">
+            <DollarSign className="h-3.5 w-3.5 mr-0.5 text-green-400" />
+            <span className="font-bold text-green-400">${totalUsdc} USDC</span>
+          </div>
+        </div>
+        
+        <div className="border-t border-gray-700 my-2 pt-2">
+          <div className="flex justify-between items-center text-xs text-gray-400">
+            <span>Your USDC balance:</span>
+            <span>
+              {isLoadingUsdcBalance ? (
+                <span className="flex items-center">
+                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                  Loading...
+                </span>
+              ) : (
+                `${usdcBalance} USDC`
+              )}
+            </span>
           </div>
         </div>
       </div>
+      
+      {estimatedGasError && (
+        <Alert variant="destructive" className="bg-red-900/20 border-red-900/30">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{estimatedGasError}</AlertDescription>
+          <p className="text-xs mt-1">This usually means the transaction would fail if submitted. Please try a different amount or check your USDC balance.</p>
+        </Alert>
+      )}
       
       {error && (
         <Alert variant="destructive">
@@ -264,17 +316,10 @@ const BuyTokensForm = ({ listing, onSuccess, onError }: BuyTokensFormProps) => {
         </Alert>
       )}
       
-      {estimatedGasError && (
-        <Alert variant="destructive" className="bg-amber-600/20 border-amber-500/30 text-amber-400">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{estimatedGasError}</AlertDescription>
-        </Alert>
-      )}
-      
       {success && (
         <Alert className="bg-green-500/20 text-green-300 border-green-500/30">
           <Check className="h-4 w-4" />
-          <AlertDescription>Purchase successful!</AlertDescription>
+          <AlertDescription>Purchase completed successfully!</AlertDescription>
         </Alert>
       )}
       
@@ -286,15 +331,18 @@ const BuyTokensForm = ({ listing, onSuccess, onError }: BuyTokensFormProps) => {
         {isSubmitting ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Processing...
+            Processing purchase...
           </>
         ) : success ? (
           <>
             <Check className="mr-2 h-4 w-4" />
-            Completed
+            Purchase Complete
           </>
         ) : (
-          'Buy Tokens'
+          <>
+            <DollarSign className="mr-1 h-4 w-4" />
+            Buy for ${totalUsdc} USDC
+          </>
         )}
       </Button>
     </form>

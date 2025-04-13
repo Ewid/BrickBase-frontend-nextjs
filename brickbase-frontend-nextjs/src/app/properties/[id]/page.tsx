@@ -78,6 +78,30 @@ const PropertyDetailPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [useMockData, setUseMockData] = useState(false);
   const [showCreateListingModal, setShowCreateListingModal] = useState(false);
+  const [ethUsdPrice, setEthUsdPrice] = useState<number | null>(null);
+
+  const fetchEthUsdPrice = async () => {
+    try {
+      const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd', {
+        signal: AbortSignal.timeout(15000), // 15 second timeout for price API
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setEthUsdPrice(data.ethereum.usd);
+      }
+    } catch (error) {
+      console.warn('Failed to fetch ETH/USD price:', error);
+    }
+  };
+  
+  useEffect(() => {
+    fetchEthUsdPrice();
+    
+    // Set up a refresh timer for ETH price
+    const priceRefreshInterval = setInterval(fetchEthUsdPrice, 60000); // Every minute
+    
+    return () => clearInterval(priceRefreshInterval);
+  }, []);
 
   useEffect(() => {
     const fetchPropertyDetails = async () => {
