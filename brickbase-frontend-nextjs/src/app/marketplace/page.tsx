@@ -5,7 +5,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ShoppingCart, Tag, Loader2, AlertCircle, RefreshCcw, Wallet, DollarSign, ExternalLink, MapPin, ArrowUpRight, Building2 } from 'lucide-react';
+import { ShoppingCart, Tag, Loader2, AlertCircle, RefreshCcw, Wallet, DollarSign, ExternalLink, MapPin, ArrowUpRight, Building2, Check } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useAccount } from '@/hooks/useAccount';
@@ -17,11 +17,13 @@ import { toast } from '@/components/ui/use-toast';
 import { Store } from 'lucide-react';
 import { ImageOff } from 'lucide-react';
 import { ethers } from 'ethers';
-import { tryConvertIpfsUrl, getActiveListings } from '@/services/marketplace';
+import { tryConvertIpfsUrl, getActiveListings, getTokenBalance, formatCurrency } from '@/services/marketplace';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Slider } from '@/components/ui/slider';
+import CreateListingForm from '@/components/CreateListingForm';
+import { PropertyDto } from '@/types/dtos';
 
 // Define interfaces for the marketplace data
 interface Listing {
@@ -35,20 +37,14 @@ interface Listing {
   active: boolean;
 }
 
-interface PropertyMetadata {
-  id: string;
-  tokenId: string;
-  metadata: {
-    name: string;
-    description: string;
-    image: string;
-    attributes: any[];
-  };
-  totalSupply: string;
+// Define EnrichedPropertyDto to include extra fields
+interface EnrichedPropertyDto extends PropertyDto {
+  balance?: string;
+  formattedBalance?: string;
 }
 
 interface EnrichedListing extends Listing {
-  propertyDetails: PropertyMetadata | null;
+  propertyDetails: EnrichedPropertyDto | null;
   formattedPrice: string;
   formattedAmount: string;
 }
@@ -105,6 +101,22 @@ const formatUSDC = (amount: string): string => {
   }
 };
 
+// Helper function to format token IDs for display - place this outside the component
+const formatTokenId = (tokenId: string | number | undefined): string => {
+  // Handle undefined case
+  if (tokenId === undefined) return 'Unknown';
+  
+  // Convert to string if it's a number
+  const idStr = typeof tokenId === 'number' ? tokenId.toString() : tokenId;
+  
+  // Shorten long IDs
+  if (idStr && idStr.length > 10) {
+    return `${idStr.substring(0, 8)}...`;
+  }
+  
+  return idStr || 'Unknown';
+};
+
 export default function MarketplacePage() {
   const { account, isConnected, connectWallet } = useAccount();
   const [listings, setListings] = useState<EnrichedListing[]>([]);
@@ -113,10 +125,19 @@ export default function MarketplacePage() {
   const [selectedListing, setSelectedListing] = useState<EnrichedListing | null>(null);
   const [purchaseAmount, setPurchaseAmount] = useState('0.000001');
   const [isPurchasing, setIsPurchasing] = useState(false);
+  const [showCreateListingModal, setShowCreateListingModal] = useState(false);
+  const [userProperties, setUserProperties] = useState<EnrichedPropertyDto[]>([]);
+  const [selectedProperty, setSelectedProperty] = useState<EnrichedPropertyDto | null>(null);
+  const [isLoadingUserProperties, setIsLoadingUserProperties] = useState(false);
+  const [transactionStep, setTransactionStep] = useState<'approve' | 'listing' | 'complete'>('approve');
+  const [isApproving, setIsApproving] = useState(false);
+  const [isListing, setIsListing] = useState(false);
+  const [approvalComplete, setApprovalComplete] = useState(false);
+  const [listingComplete, setListingComplete] = useState(false);
   
   const apiUrl = 'http://localhost:3000'; // Your backend API URL
   
-  const fetchPropertyDetails = async (listing: Listing): Promise<PropertyMetadata | null> => {
+  const fetchPropertyDetails = async (listing: Listing): Promise<EnrichedPropertyDto | null> => {
     try {
       const tokenAddress = listing.tokenAddress;
       console.log(`Making request to: ${apiUrl}/properties/token/${tokenAddress}`);
@@ -275,6 +296,162 @@ export default function MarketplacePage() {
     } finally {
       setIsPurchasing(false);
     }
+  };
+  
+  const fetchUserProperties = async () => {
+    if (!account) return;
+    
+    try {
+      setIsLoadingUserProperties(true);
+      // Call backend API with the correct endpoint path
+      try {
+        console.log(`Fetching properties owned by ${account}...`);
+        const response = await fetch(`${apiUrl}/properties/owned/${account}`, {
+          signal: AbortSignal.timeout(30000),
+          next: { revalidate: 300 }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch user properties: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('Properties owned by user:', data);
+        setUserProperties(data);
+      } catch (apiError) {
+        console.warn('API endpoint error:', apiError);
+        
+        // Fallback: Get all properties and check balances directly
+        const allPropertiesResponse = await fetch(`${apiUrl}/properties`, {
+          signal: AbortSignal.timeout(30000),
+          next: { revalidate: 300 }
+        });
+        
+        if (!allPropertiesResponse.ok) {
+          throw new Error(`Failed to fetch properties: ${allPropertiesResponse.status}`);
+        }
+        
+        const allProperties = await allPropertiesResponse.json();
+        
+        // Filter properties by checking token balances
+        const ownedProperties = await Promise.all(
+          allProperties.map(async (property: EnrichedPropertyDto) => {
+            try {
+              // Get token balance for this property using the tokenAddress property from PropertyDto
+              const tokenAddress = property.tokenAddress || 
+                                 (property.propertyDetails && property.propertyDetails.associatedPropertyToken) || 
+                                 property.id;
+              
+              const balance = await getTokenBalance(tokenAddress, account);
+              
+              // If balance > 0, user owns this property
+              if (ethers.getBigInt(balance) > ethers.getBigInt(0)) {
+                return {
+                  ...property,
+                  balance: balance,
+                  formattedBalance: formatCurrency(balance, 18)
+                };
+              }
+              return null;
+            } catch (err) {
+              console.error(`Error checking balance for property ${property.id}:`, err);
+              return null;
+            }
+          })
+        );
+        
+        // Filter out nulls (properties user doesn't own)
+        const filteredProperties = ownedProperties.filter((p): p is EnrichedPropertyDto & {balance: string; formattedBalance: string} => p !== null);
+        console.log('Properties owned by user (fallback method):', filteredProperties);
+        setUserProperties(filteredProperties);
+      }
+    } catch (error: any) {
+      console.error('Error fetching user properties:', error);
+      setUserProperties([]);
+    } finally {
+      setIsLoadingUserProperties(false);
+    }
+  };
+  
+  useEffect(() => {
+    if (account) {
+      fetchUserProperties();
+    }
+  }, [account]);
+  
+  const handleCreateListingClick = () => {
+    if (!isConnected) {
+      toast({
+        title: "Connect your wallet",
+        description: "You need to connect your wallet to create a listing",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    fetchUserProperties();
+    setShowCreateListingModal(true);
+  };
+  
+  const handlePropertySelect = (property: EnrichedPropertyDto) => {
+    setSelectedProperty(property);
+    setTransactionStep('approve');
+    setApprovalComplete(false);
+    setListingComplete(false);
+    setIsApproving(false);
+    setIsListing(false);
+  };
+  
+  const handleListingCreated = () => {
+    setShowCreateListingModal(false);
+    setSelectedProperty(null);
+    // Refresh listings to show the new one
+    fetchListings();
+    toast({
+      title: "Listing created!",
+      description: "Your property has been listed on the marketplace",
+    });
+  };
+  
+  const handleApprovalStart = () => {
+    setIsApproving(true);
+    setApprovalComplete(false);
+  };
+  
+  const handleApprovalComplete = () => {
+    setIsApproving(false);
+    setApprovalComplete(true);
+    setTransactionStep('listing');
+  };
+  
+  const handleListingStart = () => {
+    setIsListing(true);
+    setListingComplete(false);
+  };
+  
+  const handleListingComplete = () => {
+    setIsListing(false);
+    setListingComplete(true);
+    setTransactionStep('complete');
+    // Wait a second before closing dialog to show success
+    setTimeout(() => {
+      handleListingCreated();
+    }, 1500);
+  };
+  
+  const handleTransactionError = (error: any) => {
+    // Reset appropriate states based on which step failed
+    if (transactionStep === 'approve') {
+      setIsApproving(false);
+    } else {
+      setIsListing(false);
+    }
+    
+    toast({
+      title: "Transaction Failed",
+      description: error.message || "Failed to complete transaction",
+      variant: "destructive"
+    });
   };
   
   const renderContent = () => {
@@ -727,12 +904,215 @@ export default function MarketplacePage() {
             <h1 className="text-3xl font-bold mb-2">Property <span className="text-gradient">Marketplace</span></h1>
             <p className="text-gray-400">Buy and sell fractional property tokens with USDC</p>
           </div>
+          
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleRefresh}
+              className="h-10"
+            >
+              <RefreshCcw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+            
+            <Button 
+              onClick={handleCreateListingClick}
+              className="h-10 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white"
+            >
+              <Tag className="h-4 w-4 mr-2" />
+              Create Listing
+            </Button>
+          </div>
         </div>
         
         {renderContent()}
       </main>
       
       <Footer />
+      
+      <Dialog open={showCreateListingModal} onOpenChange={setShowCreateListingModal}>
+        <DialogContent className="sm:max-w-[700px] bg-gradient-to-br from-gray-900 to-gray-950 border-blue-900/50 rounded-xl backdrop-blur-lg shadow-xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">Create a New Listing</DialogTitle>
+            <DialogDescription className="text-gray-300">
+              Select a property and set your listing details to offer your tokens for sale.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {userProperties.length === 0 && !isLoadingUserProperties ? (
+            <div className="py-8 text-center space-y-4">
+              <div className="mx-auto w-16 h-16 rounded-full bg-blue-900/20 flex items-center justify-center">
+                <Store className="h-8 w-8 text-blue-400" />
+              </div>
+              <h3 className="text-lg font-medium">No Properties Found</h3>
+              <p className="text-gray-400 max-w-md mx-auto">
+                You don&apos;t own any property tokens to list. Visit the properties page to purchase tokens first.
+              </p>
+              <Button 
+                onClick={() => window.location.href = '/properties'} 
+                variant="outline"
+                className="mt-2"
+              >
+                Browse Properties
+              </Button>
+            </div>
+          ) : isLoadingUserProperties ? (
+            <div className="py-12 text-center">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+              <p className="mt-4 text-gray-400">Loading your properties...</p>
+            </div>
+          ) : selectedProperty ? (
+            <div className="space-y-6">
+              <div className="flex items-center gap-4 border-b border-gray-800 pb-4">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 px-2"
+                  onClick={() => setSelectedProperty(null)}
+                >
+                  ← Back to properties
+                </Button>
+                
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="h-10 w-10 rounded-md overflow-hidden bg-gray-800">
+                    {selectedProperty.metadata?.image ? (
+                      <Image 
+                        src={tryConvertIpfsUrl(selectedProperty.metadata.image)} 
+                        alt={selectedProperty.metadata?.name || ''} 
+                        width={40} 
+                        height={40} 
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Building2 className="h-5 w-5 text-gray-600" />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-medium">{selectedProperty.metadata?.name || 'Property Listing'}</h3>
+                    <div className="flex justify-between items-center text-xs text-gray-400">
+                      <span>Token ID: {formatTokenId(selectedProperty.tokenId)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-gray-800/30 rounded-xl p-4 border border-gray-800">
+                <div className="space-y-1 mb-3">
+                  <h4 className="text-sm font-medium text-blue-400">Transaction Status</h4>
+                  <p className="text-xs text-gray-400">
+                    Creating a listing is a two-step process: first approving token transfer, then creating the listing.
+                  </p>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <div className={`rounded-full w-8 h-8 flex items-center justify-center ${transactionStep === 'approve' || approvalComplete ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-800 text-gray-500'}`}>
+                    1
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Approve Token Transfer</p>
+                    <p className="text-xs text-gray-400">Allow the marketplace to transfer your tokens</p>
+                  </div>
+                  <div className="w-6 h-6">
+                    {isApproving && <Loader2 className="animate-spin h-5 w-5 text-blue-400" />}
+                    {approvalComplete && <Check className="h-5 w-5 text-green-400" />}
+                  </div>
+                </div>
+                
+                <div className="h-6 flex justify-center">
+                  <div className="border-l border-gray-700 h-full"></div>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <div className={`rounded-full w-8 h-8 flex items-center justify-center ${transactionStep === 'listing' || listingComplete ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-800 text-gray-500'}`}>
+                    2
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Create Listing</p>
+                    <p className="text-xs text-gray-400">Publish your listing to the marketplace</p>
+                  </div>
+                  <div className="w-6 h-6">
+                    {isListing && <Loader2 className="animate-spin h-5 w-5 text-blue-400" />}
+                    {listingComplete && <Check className="h-5 w-5 text-green-400" />}
+                  </div>
+                </div>
+              </div>
+              
+              <CreateListingForm 
+                property={{ 
+                  id: selectedProperty.id, 
+                  tokenId: typeof selectedProperty.tokenId === 'string' ? 
+                    parseInt(selectedProperty.tokenId) || 0 : selectedProperty.tokenId, 
+                  tokenAddress: selectedProperty.tokenAddress || selectedProperty.id,
+                  metadata: {
+                    name: selectedProperty.metadata?.name || 'Unknown Property',
+                    description: selectedProperty.metadata?.description || '',
+                    image: selectedProperty.metadata?.image || '',
+                    attributes: selectedProperty.metadata?.attributes || []
+                  },
+                  totalSupply: selectedProperty.totalSupply || '0',
+                  propertyDetails: {
+                    physicalAddress: getAttributeValue(selectedProperty.metadata?.attributes, 'Address', ''),
+                    sqft: parseInt(getAttributeValue(selectedProperty.metadata?.attributes, 'Square Footage', '0')) || 0,
+                    bedrooms: parseInt(getAttributeValue(selectedProperty.metadata?.attributes, 'Bedrooms', '0')) || 0,
+                    bathrooms: parseInt(getAttributeValue(selectedProperty.metadata?.attributes, 'Bathrooms', '0')) || 0,
+                    yearBuilt: parseInt(getAttributeValue(selectedProperty.metadata?.attributes, 'Year Built', '0')) || 0,
+                    propertyType: getAttributeValue(selectedProperty.metadata?.attributes, 'Property Type', ''),
+                    associatedPropertyToken: selectedProperty.tokenAddress || selectedProperty.id
+                  }
+                }} 
+                onSuccess={handleListingComplete}
+                onError={handleTransactionError}
+                onApprovalStart={handleApprovalStart}
+                onApprovalComplete={handleApprovalComplete}
+                onListingStart={handleListingStart}
+              />
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <h3 className="text-lg font-medium">Select a Property to List</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-1">
+                {userProperties.map((property, index) => (
+                  <div 
+                    key={`${property.id}-${property.tokenId}-${index}`}
+                    onClick={() => handlePropertySelect(property)}
+                    className="border border-gray-800 hover:border-blue-600/40 rounded-xl p-4 cursor-pointer transition-all bg-gray-900/50 hover:bg-gray-800/40"
+                  >
+                    <div className="flex gap-3 items-center">
+                      <div className="w-12 h-12 rounded-md bg-gray-800 overflow-hidden flex-shrink-0">
+                        {property.metadata?.image ? (
+                          <Image 
+                            src={tryConvertIpfsUrl(property.metadata.image)} 
+                            alt={property.metadata?.name || 'Property'} 
+                            width={48} 
+                            height={48} 
+                            className="object-cover w-full h-full"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Building2 className="h-6 w-6 text-gray-600" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium truncate">{property.metadata?.name || 'Unnamed Property'}</h4>
+                        <div className="flex justify-between items-center text-xs text-gray-400">
+                          <span>Token ID: {formatTokenId(property.tokenId)}</span>
+                          <span className="bg-green-900/30 text-green-400 px-2 py-0.5 rounded-full text-xs">
+                            Available
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 

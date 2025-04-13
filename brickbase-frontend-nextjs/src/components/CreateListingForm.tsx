@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Check, AlertCircle, Loader2, DollarSign } from 'lucide-react';
-import { createListing, getTokenBalance, formatCurrency, getUsdcBalance } from '@/services/marketplace';
+import { createListing, getTokenBalance, formatCurrency, getUsdcBalance, approveTokens } from '@/services/marketplace';
 import { PropertyDto } from '@/types/dtos';
 import { useAccount } from '@/hooks/useAccount';
 import { ethers } from 'ethers';
@@ -13,9 +13,19 @@ interface CreateListingFormProps {
   property: PropertyDto;
   onSuccess?: () => void;
   onError?: (error: any) => void;
+  onApprovalStart?: () => void;
+  onApprovalComplete?: () => void;
+  onListingStart?: () => void;
 }
 
-const CreateListingForm = ({ property, onSuccess, onError }: CreateListingFormProps) => {
+const CreateListingForm = ({ 
+  property, 
+  onSuccess, 
+  onError, 
+  onApprovalStart, 
+  onApprovalComplete, 
+  onListingStart 
+}: CreateListingFormProps) => {
   const { account } = useAccount();
   // Use readable token amounts in the form (without decimals)
   const [amount, setAmount] = useState<string>('');
@@ -28,6 +38,11 @@ const CreateListingForm = ({ property, onSuccess, onError }: CreateListingFormPr
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const [usdcBalance, setUsdcBalance] = useState<string>('0');
   const [isLoadingUsdcBalance, setIsLoadingUsdcBalance] = useState(false);
+  // Add new states for two-step process
+  const [step, setStep] = useState<'approve' | 'listing'>('approve');
+  const [isApproved, setIsApproved] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
+  const [approvalError, setApprovalError] = useState<string | null>(null);
   
   const propertyTokenAddress = property?.tokenAddress || property?.propertyDetails?.associatedPropertyToken || '';
   
@@ -121,18 +136,56 @@ const CreateListingForm = ({ property, onSuccess, onError }: CreateListingFormPr
     return total.toFixed(2);
   };
   
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Handle token approval
+  const handleApproveTokens = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!amount || Number(amount) <= 0) {
-      setError('Please enter a valid token amount');
+      setApprovalError('Please enter a valid token amount');
       return;
     }
     
     if (!validateAmount(amount)) {
-      setError(`You can only list up to ${formattedBalance} tokens`);
+      setApprovalError(`You can only list up to ${formattedBalance} tokens`);
       return;
     }
+    
+    setIsApproving(true);
+    setApprovalError(null);
+    
+    // Call the onApprovalStart callback if provided
+    if (onApprovalStart) onApprovalStart();
+    
+    try {
+      // Convert human readable amount to wei for the smart contract
+      const amountInWei = ethers.parseUnits(amount, 18).toString();
+      
+      console.log(`Approving ${amount} tokens (${amountInWei} wei) for marketplace`);
+      
+      // Call the approveTokens function from marketplace service
+      const result = await approveTokens(propertyTokenAddress, amountInWei);
+      
+      if (result.success) {
+        setIsApproved(true);
+        setStep('listing');
+        
+        // Call the onApprovalComplete callback if provided
+        if (onApprovalComplete) onApprovalComplete();
+      } else {
+        setApprovalError(result.error?.message || 'Failed to approve tokens');
+        if (onError) onError(result.error);
+      }
+    } catch (err: any) {
+      setApprovalError(err.message || 'An unexpected error occurred during approval');
+      if (onError) onError(err);
+    } finally {
+      setIsApproving(false);
+    }
+  };
+  
+  // Create listing after approval
+  const handleCreateListing = async (e: React.FormEvent) => {
+    e.preventDefault();
     
     if (!priceUsdc || Number(priceUsdc) <= 0) {
       setError('Please enter a valid price per token');
@@ -142,6 +195,9 @@ const CreateListingForm = ({ property, onSuccess, onError }: CreateListingFormPr
     setIsSubmitting(true);
     setError(null);
     setSuccess(false);
+    
+    // Call the onListingStart callback if provided
+    if (onListingStart) onListingStart();
     
     try {
       // Convert human readable amount to wei for the smart contract
@@ -156,6 +212,9 @@ const CreateListingForm = ({ property, onSuccess, onError }: CreateListingFormPr
         setSuccess(true);
         setAmount('');
         setPriceUsdc('');
+        // Reset the process for next time
+        setStep('approve');
+        setIsApproved(false);
         if (onSuccess) onSuccess();
       } else {
         setError(result.error?.message || 'Failed to create listing');
@@ -170,68 +229,71 @@ const CreateListingForm = ({ property, onSuccess, onError }: CreateListingFormPr
   };
   
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="amount">Amount of tokens to sell</Label>
-        <div className="flex items-center mt-1.5">
-          <Input
-            id="amount"
-            type="text"
-            value={amount}
-            onChange={handleAmountChange}
-            placeholder="Enter amount..."
-            className="flex-1"
-            disabled={isSubmitting || isLoadingBalance}
-          />
-          <Button 
-            type="button" 
-            variant="outline" 
-            className="ml-2"
-            onClick={handleSetMax}
-            disabled={isSubmitting || isLoadingBalance || balance === '0'}
-          >
-            Max
-          </Button>
+    <div className="space-y-4">
+      {/* Approval Step */}
+      <form onSubmit={step === 'approve' ? handleApproveTokens : handleCreateListing} className="space-y-4">
+        <div>
+          <Label htmlFor="amount">Amount of tokens to sell</Label>
+          <div className="flex items-center mt-1.5">
+            <Input
+              id="amount"
+              type="text"
+              value={amount}
+              onChange={handleAmountChange}
+              placeholder="Enter amount..."
+              className="flex-1"
+              disabled={isSubmitting || isLoadingBalance || isApproved || step === 'listing'}
+            />
+            <Button 
+              type="button" 
+              variant="outline" 
+              className="ml-2"
+              onClick={handleSetMax}
+              disabled={isSubmitting || isLoadingBalance || balance === '0' || isApproved || step === 'listing'}
+            >
+              Max
+            </Button>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">
+            {isLoadingBalance ? (
+              <span className="flex items-center">
+                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                Loading balance...
+              </span>
+            ) : (
+              <>Your balance: {formattedBalance} tokens</>
+            )}
+          </p>
         </div>
-        <p className="text-xs text-gray-400 mt-1">
-          {isLoadingBalance ? (
-            <span className="flex items-center">
-              <Loader2 className="h-3 w-3 animate-spin mr-1" />
-              Loading balance...
-            </span>
-          ) : (
-            <>Your balance: {formattedBalance} tokens (whole amount will be listed for sale)</>
-          )}
-        </p>
-      </div>
-      
-      <div>
-        <Label htmlFor="price" className="flex items-center">
-          <DollarSign className="h-3.5 w-3.5 mr-1" />
-          Price per token (USDC)
-        </Label>
-        <Input
-          id="price"
-          type="text"
-          value={priceUsdc}
-          onChange={(e) => {
-            // Only allow numeric input with decimals
-            if (e.target.value === '' || /^\d*\.?\d*$/.test(e.target.value)) {
-              setPriceUsdc(e.target.value);
-            }
-          }}
-          placeholder="10.00"
-          disabled={isSubmitting}
-        />
-        <div className="flex justify-between text-xs text-gray-400 mt-1">
-          <span>Set your price in USDC per token</span>
-          <span>Your USDC balance: {isLoadingUsdcBalance ? 'Loading...' : usdcBalance}</span>
+        
+        <div>
+          <Label htmlFor="price" className="flex items-center">
+            <DollarSign className="h-3.5 w-3.5 mr-1" />
+            Price per token (USDC)
+          </Label>
+          <Input
+            id="price"
+            type="text"
+            value={priceUsdc}
+            onChange={(e) => {
+              // Only allow numeric input with decimals
+              if (e.target.value === '' || /^\d*\.?\d*$/.test(e.target.value)) {
+                setPriceUsdc(e.target.value);
+              }
+            }}
+            placeholder="10.00"
+            disabled={isSubmitting || step === 'approve' && !isApproved}
+          />
+          <div className="flex justify-between text-xs text-gray-400 mt-1">
+            <span>Set your price in USDC per token</span>
+            <span>Your USDC balance: {isLoadingUsdcBalance ? 'Loading...' : usdcBalance}</span>
+          </div>
         </div>
         
         {amount && Number(amount) > 0 && priceUsdc && Number(priceUsdc) > 0 && (
-          <div className="mt-3 p-2 bg-slate-800/50 rounded border border-slate-700/50">
+          <div className="mt-3 p-3 bg-blue-900/20 rounded-lg border border-blue-900/30">
             <div className="flex justify-between items-center">
-              <span className="text-sm">Total value:</span>
+              <span className="text-sm">Total listing value:</span>
               <div className="flex items-center">
                 <DollarSign className="h-3.5 w-3.5 mr-0.5 text-green-400" />
                 <span className="font-medium text-green-400">${calculateTotalValueUsdc()} USDC</span>
@@ -239,45 +301,77 @@ const CreateListingForm = ({ property, onSuccess, onError }: CreateListingFormPr
             </div>
           </div>
         )}
-      </div>
-      
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-      
-      {success && (
-        <Alert className="bg-green-500/20 text-green-300 border-green-500/30">
-          <Check className="h-4 w-4" />
-          <AlertDescription>Listing created successfully!</AlertDescription>
-        </Alert>
-      )}
-      
-      <Button 
-        type="submit" 
-        className="w-full crypto-btn"
-        disabled={isSubmitting || success || isLoadingBalance || balance === '0' || !validateAmount(amount) || !priceUsdc}
-      >
-        {isSubmitting ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Creating listing...
-          </>
-        ) : success ? (
-          <>
-            <Check className="mr-2 h-4 w-4" />
-            Listing Created
-          </>
-        ) : (
-          <>
-            <DollarSign className="mr-1 h-4 w-4" />
-            Create USDC Listing
-          </>
+        
+        {/* Error and success messages */}
+        {approvalError && step === 'approve' && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{approvalError}</AlertDescription>
+          </Alert>
         )}
-      </Button>
-    </form>
+        
+        {error && step === 'listing' && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        
+        {success && (
+          <Alert className="bg-green-500/20 text-green-300 border-green-500/30">
+            <Check className="h-4 w-4" />
+            <AlertDescription>Listing created successfully!</AlertDescription>
+          </Alert>
+        )}
+        
+        {/* Submit button changes based on step */}
+        {step === 'approve' ? (
+          <Button 
+            type="submit" 
+            className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white"
+            disabled={isApproving || isApproved || isLoadingBalance || balance === '0' || !validateAmount(amount) || !amount}
+          >
+            {isApproving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Approving tokens...
+              </>
+            ) : isApproved ? (
+              <>
+                <Check className="mr-2 h-4 w-4" />
+                Tokens Approved
+              </>
+            ) : (
+              <>
+                Approve Tokens
+              </>
+            )}
+          </Button>
+        ) : (
+          <Button 
+            type="submit" 
+            className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white"
+            disabled={isSubmitting || success || !priceUsdc}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating listing...
+              </>
+            ) : success ? (
+              <>
+                <Check className="mr-2 h-4 w-4" />
+                Listing Created
+              </>
+            ) : (
+              <>
+                Create Listing
+              </>
+            )}
+          </Button>
+        )}
+      </form>
+    </div>
   );
 };
 
