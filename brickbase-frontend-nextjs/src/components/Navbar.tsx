@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Menu, X, Home, Building2, Wallet, ChartBar, User } from 'lucide-react';
 import { Button as ShadcnButton } from "@/components/ui/button";
+import ConnectWallet from './ConnectWallet';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -24,9 +25,9 @@ const Navbar = () => {
           <Link href="/about" className="text-white hover:text-crypto-light transition-colors">About</Link>
         </div>
 
-        {/* Reown AppKit Connect wallet button */}
+        {/* Connect wallet button */}
         <div className="hidden md:block">
-          <appkit-button />
+          <ConnectWallet />
         </div>
 
         {/* Mobile menu button (using Shadcn Button) */}
@@ -62,9 +63,9 @@ const Navbar = () => {
               <User className="h-5 w-5" />
               <span>About</span>
             </Link>
-            {/* Reown AppKit Connect button in mobile menu */}
+            {/* Connect wallet button in mobile menu */}
             <div className="pt-2">
-              <appkit-button />
+              <ConnectWallet />
             </div>
           </div>
         </div>

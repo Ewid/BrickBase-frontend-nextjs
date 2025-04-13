@@ -6,10 +6,12 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
-import { Building2, MapPin, Tag, ArrowLeft, Loader2, AlertTriangle } from "lucide-react";
+import { Building2, MapPin, Tag, ArrowLeft, Loader2, AlertTriangle, ShoppingCart } from "lucide-react";
 import Link from 'next/link';
 import { PropertyDto } from '@/types/dtos';
 import { formatUnits } from 'ethers';
+import { useAccount } from '@/hooks/useAccount';
+import CreateListingForm from '@/components/CreateListingForm';
 
 // Mock property data for fallback when API fails
 const MOCK_PROPERTY: PropertyDto = {
@@ -64,6 +66,7 @@ const DEFAULT_PROPERTY_DETAILS = {
 const PropertyDetailPage = () => {
   const params = useParams();
   const rawPropertyAddress = params?.id as string | undefined;
+  const { isConnected } = useAccount();
 
   // Use our custom hook to validate and normalize the address
 
@@ -72,6 +75,7 @@ const PropertyDetailPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [useMockData, setUseMockData] = useState(false);
+  const [showCreateListingModal, setShowCreateListingModal] = useState(false);
 
   useEffect(() => {
     const fetchPropertyDetails = async () => {
@@ -154,6 +158,11 @@ const PropertyDetailPage = () => {
 
     fetchPropertyDetails();
   }, [rawPropertyAddress, useMockData]);
+
+  const handleListingSuccess = () => {
+    // Close the modal after successful listing creation
+    setShowCreateListingModal(false);
+  };
 
   if (isLoading) {
     return (
@@ -306,13 +315,24 @@ const PropertyDetailPage = () => {
               </div>
               
               <div className="md:col-span-1 space-y-6">
-                 <div className="bg-gray-800/50 p-4 rounded-lg text-center">
-                    <p className="text-gray-400 text-sm">Purchase options available on the Marketplace.</p>
-                    <Link href="/marketplace" className="mt-2 inline-block">
-                        <Button variant="outline" className="border-crypto-light/30 text-crypto-light hover:bg-crypto-light/10">
+                <div className="bg-gray-800/50 p-4 rounded-lg text-center">
+                  <p className="text-gray-400 text-sm">Purchase options available on the Marketplace.</p>
+                  <div className="mt-4 flex flex-col gap-2">
+                    <Link href="/marketplace" className="inline-block">
+                        <Button variant="outline" className="w-full border-crypto-light/30 text-crypto-light hover:bg-crypto-light/10">
+                            <ShoppingCart className="mr-2 h-4 w-4" />
                             Go to Marketplace
                         </Button>
                     </Link>
+                    {isConnected && propertyDetails.associatedPropertyToken && (
+                      <Button 
+                        className="w-full crypto-btn"
+                        onClick={() => setShowCreateListingModal(true)}
+                      >
+                        Create Listing
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -320,6 +340,38 @@ const PropertyDetailPage = () => {
           </div>
         </div>
       </main>
+
+      {/* Create Listing Modal */}
+      {showCreateListingModal && property && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="glass-card rounded-lg max-w-md w-full p-6">
+            <div className="flex justify-between items-start mb-4">
+              <h2 className="text-xl font-bold">Create Property Listing</h2>
+              <Button 
+                variant="ghost" 
+                className="h-8 w-8 p-0" 
+                onClick={() => setShowCreateListingModal(false)}
+              >
+                ✕
+              </Button>
+            </div>
+            
+            <div className="mb-4">
+              <h3 className="font-semibold">{property.metadata?.name}</h3>
+              <p className="text-sm text-gray-400">
+                Token: {propertyDetails.associatedPropertyToken?.slice(0, 6)}...{propertyDetails.associatedPropertyToken?.slice(-4)}
+              </p>
+            </div>
+            
+            <CreateListingForm 
+              property={property} 
+              onSuccess={handleListingSuccess}
+              onError={(error) => console.error('Listing creation error:', error)}
+            />
+          </div>
+        </div>
+      )}
+      
       <Footer />
     </div>
   );
