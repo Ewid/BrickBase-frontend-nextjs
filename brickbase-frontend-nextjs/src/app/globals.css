@@ -107,4 +107,15 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Hide the ReOwn wallet badge at the bottom of the page */
+/* Target specifically the wallet display at the bottom, not in the header */
+body > div:last-of-type > div:has(> span.text-crypto-light:contains("0xa831")),
+body > div:last-of-type > div.flex.items-center.gap-2:has(> div > span.text-crypto-light),
+body > div:last-of-type > div.flex:has(> div.text-sm.bg-crypto-dark),
+body > div:last-of-type > div.flex:has(> button > svg.lucide-log-out),
+body > div:last-of-type > div:has(> div.text-sm.bg-crypto-dark + button) {
+  display: none !important;
+  visibility: hidden !important;
 } 
