@@ -82,11 +82,13 @@ const PropertiesPage = () => {
           setUseMockData(true);
           setProperties(MOCK_PROPERTIES);
         } else {
-          // De-duplicate properties by ID to avoid React key conflicts
+          // De-duplicate properties by ID and tokenId to avoid React key conflicts
           const uniquePropertiesMap = new Map<string, PropertyDto>();
           data.forEach(property => {
             if (property.id) {
-              uniquePropertiesMap.set(property.id, property);
+              // Create a composite key using both id and tokenId
+              const uniqueKey = `${property.id}-${property.tokenId || 0}`;
+              uniquePropertiesMap.set(uniqueKey, property);
             }
           });
           

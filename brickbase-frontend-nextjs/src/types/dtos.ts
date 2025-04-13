@@ -4,15 +4,26 @@
 // --- Marketplace DTOs ---
 
 export interface ListingDto {
-  listingId: number; 
-  nftAddress: string;
-  tokenId: string; // Changed from number to string to match backend data
+  id?: string;
+  listingId?: string; // API returns listingId instead of id
   seller: string;
-  tokenAddress: string; // Changed from propertyTokenAddress to match backend
-  amount: string; // Use string for BigInt representation
-  pricePerToken: string; // Use string for BigInt representation
-  active: boolean; // Changed from isActive to match backend
-  createdAt?: Date; // Made optional as it's not in the backend response
+  propertyToken?: string;
+  tokenAmount?: string;
+  amount?: string; // API uses amount field instead of tokenAmount
+  pricePerToken: string;
+  price?: string; // Alternative field name for pricePerToken
+  isActive?: boolean;
+  active?: boolean; // API uses active instead of isActive
+  nftAddress?: string;
+  tokenId?: string;
+  tokenAddress?: string;
+  // UI helper properties
+  propertyMetadata?: {
+    name: string;
+    image: string;
+    tokenSymbol?: string;
+    propertyAddress?: string;
+  };
 }
 
 export interface PriceHistoryDto {
@@ -126,4 +137,11 @@ export interface CreateInstallmentPlanDto {
   downPayment: number;
   interestRate: number;
   termMonths: number;
+}
+
+export interface TransactionResponse {
+  success: boolean;
+  transaction?: any;
+  error?: any;
+  listingId?: string;
 } 

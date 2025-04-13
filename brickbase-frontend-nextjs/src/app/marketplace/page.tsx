@@ -1,387 +1,584 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
-import PropertyCard from '@/components/PropertyCard';
-import { ShoppingCart, Filter, ArrowDownAZ, Loader2, AlertTriangle, Tag } from 'lucide-react';
-import { ListingDto, PropertyDto } from '@/types/dtos';
-import { formatUnits } from 'ethers';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ShoppingCart, Tag, Loader2, AlertCircle, RefreshCcw, Wallet, DollarSign, ExternalLink, MapPin, ArrowUpRight, Building2 } from 'lucide-react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { useAccount } from '@/hooks/useAccount';
+import BuyTokensForm from '@/components/BuyTokensForm';
+import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { toast } from '@/components/ui/use-toast';
+import { Store } from 'lucide-react';
+import { ImageOff } from 'lucide-react';
+import { ethers } from 'ethers';
+import { tryConvertIpfsUrl } from '@/services/marketplace';
 
-// Helper function to modify existing API calls to match new data structure
-const fetchPropertyDetails = async (apiUrl: string, propertyId: string): Promise<PropertyDto | null> => {
-  try {
-    const response = await fetch(`${apiUrl}/properties/${propertyId}`, {
-      cache: 'force-cache',
-      signal: AbortSignal.timeout(5000)
-    });
-    
-    if (!response.ok) return null;
-    
-    const data = await response.json();
-    console.log(`Fetched property ${propertyId}:`, data);
-    
-    // Make sure the data has a propertyDetails property
-    if (!data.propertyDetails) {
-      data.propertyDetails = {
-        physicalAddress: 'Address not available',
-        sqft: 0,
-        bedrooms: 0,
-        bathrooms: 0,
-        yearBuilt: 0,
-        propertyType: 'Unknown',
-        associatedPropertyToken: ''
-      };
-    }
-    
-    return data;
-  } catch (error) {
-    console.error(`Error fetching property ${propertyId}:`, error);
-    return null;
-  }
-};
-
-// Mock data for when API is unavailable
-const MOCK_LISTINGS: ListingDto[] = [
-  {
-    listingId: 1,
-    nftAddress: '0xda988e1D11748E6589ac8a256A6cb61A3dd4F9D2',
-    tokenId: "1",
-    seller: '0x0B39C0f5F9de8B567116FFdB15543811491DF976',
-    tokenAddress: '0x6fb0d9B37a681187C85E505596B45c4B3bE09222',
-    amount: '1000000000000000000',
-    pricePerToken: '50000000000000000',
-    active: true
-  },
-  {
-    listingId: 2,
-    nftAddress: '0xda988e1D11748E6589ac8a256A6cb61A3dd4F9D2',
-    tokenId: "2",
-    seller: '0x0B39C0f5F9de8B567116FFdB15543811491DF976',
-    tokenAddress: '0x6fb0d9B37a681187C85E505596B45c4B3bE09222',
-    amount: '2000000000000000000',
-    pricePerToken: '60000000000000000',
-    active: true
-  },
-  {
-    listingId: 3,
-    nftAddress: '0xda988e1D11748E6589ac8a256A6cb61A3dd4F9D2',
-    tokenId: "3",
-    seller: '0x0B39C0f5F9de8B567116FFdB15543811491DF976',
-    tokenAddress: '0x6fb0d9B37a681187C85E505596B45c4B3bE09222',
-    amount: '1500000000000000000',
-    pricePerToken: '55000000000000000',
-    active: true
-  }
-];
-
-const MOCK_PROPERTIES: Record<string, PropertyDto> = {
-  '0xda988e1D11748E6589ac8a256A6cb61A3dd4F9D2': {
-    id: '0xda988e1D11748E6589ac8a256A6cb61A3dd4F9D2',
-    tokenId: 1,
-    metadata: {
-      name: 'Luxury Condo #1',
-      description: 'A stunning luxury condo in the heart of the city with beautiful views and modern amenities.',
-      image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=2070',
-      attributes: [
-        { trait_type: 'Address', value: '123 Crypto Ave, Blockchain City' },
-        { trait_type: 'Square Footage', value: 2500 }
-      ]
-    },
-    totalSupply: '10000000000000000000000',
-    propertyDetails: {
-      physicalAddress: '123 Crypto Ave, Blockchain City',
-      sqft: 2500,
-      bedrooms: 3,
-      bathrooms: 2,
-      yearBuilt: 2022,
-      propertyType: 'Residential',
-      associatedPropertyToken: '0x6fb0d9B37a681187C85E505596B45c4B3bE09222'
-    }
-  }
-};
-
-// Helper function to fetch IPFS metadata with caching and timeout
-const metadataCache = new Map<string, Record<string, any> | null>();
-async function fetchIpfsMetadata(tokenUri: string): Promise<Record<string, any> | null> {
-  if (!tokenUri || !tokenUri.startsWith('ipfs://')) return null;
-  
-  // Return cached value if available
-  if (metadataCache.has(tokenUri)) {
-    return metadataCache.get(tokenUri) || null;
-  }
-  
-  const cid = tokenUri.replace('ipfs://', '');
-  // Try gateway.pinata.cloud as it can be faster than ipfs.io
-  const url = `https://gateway.pinata.cloud/ipfs/${cid}`;
-  
-  try {
-    // Set timeout to prevent hanging requests
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-    
-    const response = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) return null;
-    const data = await response.json();
-    
-    // Cache the result
-    metadataCache.set(tokenUri, data);
-    return data;
-  } catch (err) {
-    // If pinata fails, try ipfs.io as fallback
-    try {
-      const fallbackUrl = `https://ipfs.io/ipfs/${cid}`;
-      const response = await fetch(fallbackUrl);
-      if (!response.ok) return null;
-      const data = await response.json();
-      metadataCache.set(tokenUri, data);
-      return data;
-    } catch {
-      metadataCache.set(tokenUri, null);
-      return null;
-    }
-  }
+// Define interfaces for the marketplace data
+interface Listing {
+  listingId: number;
+  seller: string;
+  nftAddress: string;
+  tokenId: string;
+  tokenAddress: string;
+  pricePerToken: string;
+  amount: string;
+  active: boolean;
 }
 
-const MarketplacePage = () => {
-  const [listings, setListings] = useState<ListingDto[]>([]);
-  const [propertyDataMap, setPropertyDataMap] = useState<Record<string, PropertyDto>>({});
+interface PropertyMetadata {
+  id: string;
+  tokenId: string;
+  metadata: {
+    name: string;
+    description: string;
+    image: string;
+    attributes: any[];
+  };
+  totalSupply: string;
+}
+
+interface EnrichedListing extends Listing {
+  propertyDetails: PropertyMetadata | null;
+  formattedPrice: string;
+  formattedAmount: string;
+  usdPrice?: string; // For USD price display
+}
+
+// Helper function to extract attribute value with fallback
+const getAttributeValue = (attributes: any, traitType: string, defaultValue: any = null) => {
+  if (!attributes) return defaultValue;
+  
+  // Try standard format first
+  if (attributes[traitType] !== undefined) {
+    return attributes[traitType];
+  }
+  
+  // Try array format (trait_type/value pairs)
+  if (Array.isArray(attributes)) {
+    const attr = attributes.find((attr: any) => 
+      attr.trait_type === traitType || 
+      attr.trait_type?.toLowerCase() === traitType.toLowerCase()
+    );
+    return attr ? attr.value : defaultValue;
+  }
+  
+  return defaultValue;
+};
+
+// Helper function to truncate addresses
+function shortenAddress(address: string): string {
+  if (!address) return 'Unknown';
+  return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+}
+
+export default function MarketplacePage() {
+  const { account, isConnected, connectWallet } = useAccount();
+  const [listings, setListings] = useState<EnrichedListing[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [useMockData, setUseMockData] = useState(false);
-
-  useEffect(() => {
-    const fetchMarketplaceData = async () => {
+  const [selectedListing, setSelectedListing] = useState<EnrichedListing | null>(null);
+  const [ethUsdPrice, setEthUsdPrice] = useState<number | null>(null);
+  
+  const apiUrl = 'http://localhost:3000'; // Your backend API URL
+  
+  // Fetch ETH to USD price
+  const fetchEthUsdPrice = async () => {
+    try {
+      const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
+      if (response.ok) {
+        const data = await response.json();
+        setEthUsdPrice(data.ethereum.usd);
+      }
+    } catch (error) {
+      console.warn('Failed to fetch ETH/USD price:', error);
+    }
+  };
+  
+  const fetchPropertyDetails = async (nftAddress: string): Promise<PropertyMetadata | null> => {
+    try {
+      console.log(`Making request to: ${apiUrl}/properties/${nftAddress}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      const response = await fetch(`${apiUrl}/properties/${nftAddress}`, {
+        signal: controller.signal,
+        next: { revalidate: 300 } // Revalidate cache every 5 minutes
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`Property API returned status ${response.status}`);
+      }
+      
+      // Get raw response text first
+      const responseText = await response.text();
+      console.log(`Raw property response for ${nftAddress}:`, 
+                 responseText ? (responseText.length > 200 ? 
+                                responseText.substring(0, 200) + "..." : 
+                                responseText) : 
+                                "EMPTY RESPONSE");
+      
+      // Handle empty response
+      if (!responseText || responseText.trim() === '') {
+        console.warn(`Empty response from property API for ${nftAddress}`);
+        return null;
+      }
+      
+      // Try parsing the response
+      try {
+        const data = JSON.parse(responseText);
+        return data;
+      } catch (jsonError) {
+        console.error("Invalid JSON in property response:", jsonError);
+        return null;
+      }
+    } catch (error: any) {
+      console.error(`Error fetching property ${nftAddress}:`, error);
+      return null;
+    }
+  };
+  
+  const fetchListings = async () => {
+    try {
       setIsLoading(true);
       setError(null);
       
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
-        
-        let listingsData: ListingDto[] = [];
-        
-        try {
-          // 1. Attempt to fetch listings
-          const listingsResponse = await fetch(`${apiUrl}/marketplace/listings`, {
-            cache: 'no-store',
-            signal: AbortSignal.timeout(5000)
-          });
+      // 1. Fetch listings from marketplace
+      console.log("Fetching marketplace listings...");
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      const response = await fetch(`${apiUrl}/marketplace/listings`, {
+        signal: controller.signal,
+        next: { revalidate: 300 } // Revalidate cache every 5 minutes
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch listings: ${response.status} ${response.statusText}`);
+      }
+      
+      // Get raw text first to debug
+      const responseText = await response.text();
+      console.log("Raw listings response:", responseText.substring(0, 200) + "...");
+      
+      // Parse the text to JSON manually to better handle errors
+      const rawListings = responseText ? JSON.parse(responseText) : [];
+      console.log(`Found ${rawListings.length} listings`);
+      
+      // 2. Enrich listings with property details
+      const enrichedListings = await Promise.all(
+        rawListings.map(async (listing: Listing) => {
+          // Calculate formatted values for display
+          const formattedPrice = ethers.formatUnits(listing.pricePerToken, 18);
+          const formattedAmount = ethers.formatUnits(listing.amount, 18);
           
-          if (!listingsResponse.ok) {
-            throw new Error(`HTTP error fetching listings! status: ${listingsResponse.status}`);
+          // Calculate USD price if ETH price is available
+          let usdPrice = undefined;
+          if (ethUsdPrice) {
+            const ethPrice = parseFloat(formattedPrice);
+            usdPrice = (ethPrice * ethUsdPrice).toFixed(2);
           }
           
-          listingsData = await listingsResponse.json();
-          console.log("Raw listings from API:", listingsData);
-        } catch (listingsErr) {
-          console.warn("Error fetching listings, using mock data:", listingsErr);
-          listingsData = MOCK_LISTINGS;
-          setUseMockData(true);
-        }
-        
-        setListings(listingsData);
-        
-        // If we're using mock data, use mock properties too
-        if (useMockData) {
-          setPropertyDataMap(MOCK_PROPERTIES);
-          setIsLoading(false);
-          return;
-        }
-
-        // 2. Get unique property addresses from listings
-        const propertyAddresses = Array.from(new Set(listingsData.map(l => l.nftAddress))); 
-        if (propertyAddresses.length === 0) {
-          setIsLoading(false);
-          return; // No properties to fetch details for
-        }
-
-        // 3. Batch requests for property details to reduce network load
-        const properties: Record<string, PropertyDto> = {};
-        
-        try {
-          for (const address of propertyAddresses) {
-            const property = await fetchPropertyDetails(apiUrl, address);
-            if (property) {
-              properties[address] = property;
-              // Update state incrementally for faster UI feedback
-              setPropertyDataMap(prev => ({ ...prev, [address]: property }));
+          // Start with null property details
+          let propertyDetails = null;
+          
+          // Fetch property details for each listing
+          if (listing.nftAddress) {
+            try {
+              console.log(`Fetching property details for NFT: ${listing.nftAddress}`);
+              propertyDetails = await fetchPropertyDetails(listing.nftAddress);
+            } catch (err) {
+              console.error(`Error fetching property details for NFT ${listing.nftAddress}:`, err);
             }
           }
           
-          // If we didn't get any properties, use mock data
-          if (Object.keys(properties).length === 0) {
-            setPropertyDataMap(MOCK_PROPERTIES);
-            setUseMockData(true);
-          }
-          
-        } catch (propertiesErr) {
-          console.warn("Error fetching properties, using mock data:", propertiesErr);
-          setPropertyDataMap(MOCK_PROPERTIES);
-          setUseMockData(true);
-        }
-
-      } catch (err: any) {
-        console.error("Failed to fetch marketplace data:", err);
-        setError(err.message || 'Failed to load marketplace listings.');
-        
-        // Fall back to mock data on error
-        setListings(MOCK_LISTINGS);
-        setPropertyDataMap(MOCK_PROPERTIES);
-        setUseMockData(true);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchMarketplaceData();
-  }, [useMockData]);
-
-  // --- Render Logic ---
+          return {
+            ...listing,
+            propertyDetails,
+            formattedPrice,
+            formattedAmount,
+            usdPrice
+          };
+        })
+      );
+      
+      setListings(enrichedListings);
+    } catch (err: any) {
+      console.error("Error in fetchListings:", err);
+      setError(err.message || "Failed to fetch listings");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  useEffect(() => {
+    // Fetch ETH/USD price first, then fetch listings
+    fetchEthUsdPrice().then(fetchListings);
+    
+    // Set up a refresh timer for ETH price
+    const priceRefreshInterval = setInterval(fetchEthUsdPrice, 60000); // Every minute
+    
+    return () => clearInterval(priceRefreshInterval);
+  }, []);
+  
+  const handleRefresh = () => {
+    fetchEthUsdPrice().then(fetchListings);
+  };
+  
+  const handlePurchaseSuccess = () => {
+    // Refresh listings after successful purchase
+    fetchListings();
+    // Clear selected listing
+    setSelectedListing(null);
+  };
+  
   const renderContent = () => {
     if (isLoading) {
       return (
-        <div className="flex justify-center items-center py-20 col-span-full">
-          <Loader2 className="h-12 w-12 animate-spin text-crypto-light" />
-          <p className="ml-4 text-lg text-gray-400">Loading Marketplace...</p>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       );
     }
-
-    if (error && !useMockData) {
+    
+    if (error) {
       return (
-        <div className="text-center py-20 text-red-500 col-span-full">
-          <AlertTriangle className="h-12 w-12 mx-auto mb-2"/>
-          <p>Error loading marketplace: {error}</p>
+        <div className="flex flex-col items-center justify-center min-h-[400px] gap-2 text-center">
+          <AlertCircle className="h-8 w-8 text-destructive" />
+          <h3 className="text-xl font-semibold">Failed to load marketplace listings</h3>
+          <p className="text-gray-400 max-w-md">
+            {error}
+          </p>
           <Button 
-            variant="outline" 
-            className="mt-4 border-crypto-light/30 text-crypto-light"
-            onClick={() => setUseMockData(true)}>
-            View Demo Data
+            variant="outline"
+            onClick={handleRefresh}
+            className="mt-2"
+          >
+            Retry
           </Button>
         </div>
       );
     }
-
+    
     if (listings.length === 0) {
       return (
-        <div className="text-center py-20 text-gray-400 col-span-full">
-           <ShoppingCart className="h-12 w-12 mx-auto mb-4 opacity-50"/>
-          <p>No active listings found.</p>
-        </div>
-      );
-    }
-
-    // Filter only active listings and log for debugging
-    const activeListings = listings.filter(listing => listing.active === true);
-    console.log(`Found ${listings.length} total listings, ${activeListings.length} are active`);
-
-    if (activeListings.length === 0 && listings.length > 0) {
-      return (
-        <div className="text-center py-20 text-gray-400 col-span-full">
-           <AlertTriangle className="h-12 w-12 mx-auto mb-4 opacity-50"/>
-          <p>Found {listings.length} listings, but none are active.</p>
+        <div className="flex flex-col items-center justify-center min-h-[400px] gap-2 text-center">
+          <Store className="h-8 w-8 text-gray-400" />
+          <h3 className="text-xl font-semibold">No Active Listings</h3>
+          <p className="text-gray-400 max-w-md">
+            There are currently no properties listed on the marketplace.
+          </p>
           <Button 
-            variant="outline" 
-            className="mt-4 border-crypto-light/30 text-crypto-light"
-            onClick={() => console.log("Listings data:", listings)}>
-            Debug Listings
+            variant="outline"
+            onClick={handleRefresh}
+            className="mt-2"
+          >
+            Refresh Page
           </Button>
         </div>
       );
     }
-
+    
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {useMockData && (
-          <div className="col-span-full mb-4 py-2 px-4 bg-yellow-500/20 text-yellow-300 rounded-md text-sm flex items-center">
-            <AlertTriangle className="h-4 w-4 mr-2" />
-            <p>Using demo data. Connect your backend API to see real marketplace listings.</p>
-          </div>
-        )}
-        
-        {activeListings.map(listing => {
-          // Find property by matching property.id with listing.nftAddress
-          const property = Object.values(propertyDataMap).find(p => p.id === listing.nftAddress);
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {listings.map((listing) => {
+          const propertyData = listing.propertyDetails;
           
-          if (!property) { 
-            return (
-              <div key={listing.listingId} className="glass-card rounded-lg p-4 flex items-center justify-center text-gray-500 min-h-[300px]">
-                Loading details...
-              </div>
-            );
-          }
-
-          // Extract data from metadata directly now
-          const metadata = property.metadata;
+          // Handle cases where property data is missing or has errors
+          const isPropertyDataValid = propertyData !== null;
           
-          // Helper function to get attribute values
-          const getAttributeValue = (traitType: string, defaultValue: any) => {
-            const attr = metadata?.attributes?.find((attr: any) => attr.trait_type === traitType);
-            return attr ? attr.value : defaultValue;
-          };
+          // Extract property details
+          const attributes = isPropertyDataValid ? propertyData.metadata?.attributes : null;
+          const location = getAttributeValue(attributes, 'location', 'Location not specified');
+          const sqft = getAttributeValue(attributes, 'sqft', 0);
+          const bedrooms = getAttributeValue(attributes, 'bedrooms', 0);
+          const bathrooms = getAttributeValue(attributes, 'bathrooms', 0);
+          const propertyType = getAttributeValue(attributes, 'propertyType', 'Not specified');
           
-          // Extract address and sqft from metadata attributes
-          const address = getAttributeValue('Address', 'Location not available');
-          const sqft = getAttributeValue('Square Footage', 0);
-
-          // Format BigInt strings from listing
-          const formattedPrice = formatUnits(listing.pricePerToken, 18);
-          const formattedAmount = formatUnits(listing.amount, 18);
-
-          // Parse tokenId from string to number if needed
-          const tokenId = typeof listing.tokenId === 'string' ? parseInt(listing.tokenId, 10) : listing.tokenId;
-
           return (
-            <PropertyCard 
-              key={listing.listingId}
-              id={tokenId}
-              nftAddress={listing.nftAddress}
-              title={metadata?.name || 'Loading...'}
-              location={address}
-              price={`Ξ ${parseFloat(formattedPrice).toFixed(5)}`}
-              cryptoPrice={`${parseFloat(formattedAmount).toLocaleString()} tokens`}
-              imageUrl={metadata?.image || ''}
-              sqft={sqft}
-              featured={false}
-            />
+            <Card key={listing.listingId} className="overflow-hidden h-full flex flex-col border-gray-800 hover:border-gray-700 transition-colors">
+              <CardHeader className="p-0">
+                {isPropertyDataValid && propertyData.metadata?.image ? (
+                  <div className="relative h-48 w-full">
+                    <Image
+                      src={tryConvertIpfsUrl(propertyData.metadata.image)}
+                      alt={propertyData.metadata.name || 'Property image'}
+                      fill
+                      className="object-cover"
+                      onError={(e) => {
+                        e.currentTarget.src = '/property-placeholder.jpg';
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                    <Badge 
+                      variant="outline" 
+                      className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm border-gray-500"
+                    >
+                      {listing.formattedPrice} ETH
+                    </Badge>
+                  </div>
+                ) : (
+                  <div className="relative h-48 w-full bg-slate-800 flex items-center justify-center">
+                    <ImageOff className="h-10 w-10 text-gray-500" />
+                    <Badge 
+                      variant="outline" 
+                      className="absolute top-3 right-3 border-gray-500"
+                    >
+                      {listing.formattedPrice} ETH
+                    </Badge>
+                  </div>
+                )}
+              </CardHeader>
+              <CardContent className="p-4 flex-grow">
+                <div className="flex flex-col gap-2">
+                  <h3 className="font-semibold text-lg line-clamp-1">
+                    {isPropertyDataValid ? propertyData.metadata?.name : 'Property Information Unavailable'}
+                  </h3>
+                  
+                  <div className="flex items-center text-sm text-gray-400">
+                    <MapPin className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
+                    <span className="line-clamp-1">{location}</span>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {sqft > 0 && (
+                      <div className="flex items-center gap-1 text-xs bg-gray-800/80 px-2 py-1 rounded-full">
+                        <Building2 className="h-3 w-3 text-gray-400" />
+                        <span>{sqft} sqft</span>
+                      </div>
+                    )}
+                    {bedrooms > 0 && (
+                      <div className="flex items-center gap-1 text-xs bg-gray-800/80 px-2 py-1 rounded-full">
+                        <Tag className="h-3 w-3 text-gray-400" />
+                        <span>{bedrooms} Beds</span>
+                      </div>
+                    )}
+                    {bathrooms > 0 && (
+                      <div className="flex items-center gap-1 text-xs bg-gray-800/80 px-2 py-1 rounded-full">
+                        <Tag className="h-3 w-3 text-gray-400" />
+                        <span>{bathrooms} Baths</span>
+                      </div>
+                    )}
+                    {propertyType && (
+                      <div className="flex items-center gap-1 text-xs bg-gray-800/80 px-2 py-1 rounded-full">
+                        <Tag className="h-3 w-3 text-gray-400" />
+                        <span>{propertyType}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="border-t border-gray-800 my-3"></div>
+                
+                <div className="text-sm">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-gray-400">Available:</span>
+                    <span className="font-medium">{listing.formattedAmount} tokens</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400">Price per token:</span>
+                    <div className="text-right">
+                      <span className="font-medium">{listing.formattedPrice} ETH</span>
+                      {listing.usdPrice && (
+                        <div className="text-xs text-gray-400 flex items-center justify-end">
+                          <DollarSign className="h-3 w-3 mr-0.5" />
+                          <span>${listing.usdPrice}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="p-4 pt-0 flex gap-2">
+                <Link href={`/properties/${listing.nftAddress || 'unknown'}`} className="flex-1">
+                  <Button variant="outline" className="w-full text-xs" size="sm">
+                    View Property
+                    <ArrowUpRight className="h-3 w-3 ml-1.5" />
+                  </Button>
+                </Link>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button className="flex-[2] crypto-btn text-xs" size="sm">Buy Tokens</Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                      <DialogTitle>
+                        {isPropertyDataValid ? propertyData.metadata?.name : 'Property Listing'}
+                      </DialogTitle>
+                      <DialogDescription>
+                        {isPropertyDataValid ? (
+                          propertyData.metadata?.description || 'No description available'
+                        ) : (
+                          'Property details are currently unavailable. You can still purchase tokens.'
+                        )}
+                      </DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="flex flex-col md:flex-row gap-4 py-4">
+                      <div className="md:w-1/3">
+                        <div className="relative h-48 w-full rounded-md overflow-hidden">
+                          {isPropertyDataValid && propertyData.metadata?.image ? (
+                            <Image
+                              src={tryConvertIpfsUrl(propertyData.metadata.image)}
+                              alt={propertyData.metadata.name || 'Property image'}
+                              fill
+                              className="object-cover"
+                              onError={(e) => {
+                                e.currentTarget.src = '/property-placeholder.jpg';
+                              }}
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-slate-800 flex items-center justify-center">
+                              <ImageOff className="h-8 w-8 text-gray-500" />
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          {location && (
+                            <div className="flex items-center text-xs text-gray-400">
+                              <MapPin className="h-3 w-3 mr-1" />
+                              <span>{location}</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {sqft > 0 && (
+                            <div className="flex items-center gap-1 text-xs bg-gray-800/80 px-2 py-1 rounded-full">
+                              <span>{sqft} sqft</span>
+                            </div>
+                          )}
+                          {bedrooms > 0 && (
+                            <div className="flex items-center gap-1 text-xs bg-gray-800/80 px-2 py-1 rounded-full">
+                              <span>{bedrooms} Bed</span>
+                            </div>
+                          )}
+                          {bathrooms > 0 && (
+                            <div className="flex items-center gap-1 text-xs bg-gray-800/80 px-2 py-1 rounded-full">
+                              <span>{bathrooms} Bath</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="mt-3">
+                          <Link href={`/properties/${listing.nftAddress || 'unknown'}`} className="text-xs text-blue-400 hover:text-blue-300 flex items-center">
+                            View property details
+                            <ArrowUpRight className="h-3 w-3 ml-1" />
+                          </Link>
+                        </div>
+                      </div>
+                      
+                      <div className="md:w-2/3">
+                        <div className="bg-gray-800/50 p-3 rounded-md mb-4">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-gray-300">Price per token:</span>
+                            <div className="text-right">
+                              <div>{listing.formattedPrice} ETH</div>
+                              {listing.usdPrice && (
+                                <div className="text-xs text-gray-400">≈ ${listing.usdPrice} USD</div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-300">Available tokens:</span>
+                            <span>{listing.formattedAmount}</span>
+                          </div>
+                        </div>
+                        
+                        <BuyTokensForm 
+                          listing={{
+                            id: listing.listingId.toString(),
+                            seller: listing.seller,
+                            tokenAmount: listing.amount,
+                            pricePerToken: listing.pricePerToken,
+                            ethUsdPrice: ethUsdPrice || undefined
+                          }}
+                          onSuccess={() => {
+                            toast({
+                              title: "Tokens purchased successfully!",
+                              description: "Your tokens have been added to your wallet.",
+                            });
+                            handlePurchaseSuccess();
+                          }}
+                          onError={(error) => {
+                            toast({
+                              variant: "destructive",
+                              title: "Transaction failed",
+                              description: error?.message || "There was an error processing your transaction.",
+                            });
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </CardFooter>
+            </Card>
           );
         })}
       </div>
     );
-  }
-
-
+  };
+  
   return (
-    <div className="min-h-screen bg-crypto-dark flex flex-col">
+    <div className="min-h-screen bg-crypto-dark">
       <Navbar />
-      <main className="flex-grow pt-24 pb-10 px-6 max-w-7xl mx-auto w-full">
-         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12">
+      
+      <main className="pt-24 pb-10 px-6 max-w-7xl mx-auto">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12">
           <div className="mb-6 md:mb-0">
-            <h1 className="text-3xl font-bold mb-2">NFT <span className="text-gradient">Marketplace</span></h1>
+            <h1 className="text-3xl font-bold mb-2">Property <span className="text-gradient">Marketplace</span></h1>
             <p className="text-gray-400">Buy and sell fractional property tokens</p>
           </div>
+          
           <div className="flex flex-col sm:flex-row gap-4">
-            {/* TODO: Implement filter/sort functionality */}
-            <Button variant="outline" className="border-crypto-light/30 text-crypto-light">
-              <Filter className="mr-2 h-4 w-4" />
-              Filter
-            </Button>
-            <Button variant="outline" className="border-crypto-light/30 text-crypto-light">
-              <ArrowDownAZ className="mr-2 h-4 w-4" />
-              Sort By
+            {ethUsdPrice && (
+              <div className="text-sm bg-green-900/30 px-4 py-2 rounded-md border border-green-500/30 flex items-center">
+                <DollarSign className="h-4 w-4 mr-1 text-green-400" />
+                <span className="text-green-400">1 ETH = ${ethUsdPrice}</span>
+              </div>
+            )}
+            
+            {!isConnected ? (
+              <Button 
+                variant="outline" 
+                className="border-crypto-light/30 text-crypto-light"
+                onClick={connectWallet}
+              >
+                Connect Wallet
+              </Button>
+            ) : (
+              <div className="text-sm bg-crypto-dark/50 px-4 py-2 rounded-md border border-crypto-light/30">
+                <span className="text-gray-400 mr-2">Connected:</span>
+                <span className="text-crypto-light">{account?.slice(0, 6)}...{account?.slice(-4)}</span>
+              </div>
+            )}
+            
+            <Button 
+              variant="outline" 
+              className="border-crypto-light/30 text-crypto-light"
+              onClick={handleRefresh}
+              disabled={isLoading}
+            >
+              Refresh
             </Button>
           </div>
         </div>
-
+        
         {renderContent()}
-
       </main>
+      
       <Footer />
     </div>
   );
-};
-
-export default MarketplacePage; 
+} 
