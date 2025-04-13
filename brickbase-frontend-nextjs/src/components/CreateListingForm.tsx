@@ -3,8 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Check, AlertCircle, Loader2 } from 'lucide-react';
-import { createListing, getTokenBalance, formatCurrency } from '@/services/marketplace';
+import { Check, AlertCircle, Loader2, DollarSign } from 'lucide-react';
+import { createListing, getTokenBalance, formatCurrency, getUsdcBalance } from '@/services/marketplace';
 import { PropertyDto } from '@/types/dtos';
 import { useAccount } from '@/hooks/useAccount';
 import { ethers } from 'ethers';
@@ -19,40 +19,57 @@ const CreateListingForm = ({ property, onSuccess, onError }: CreateListingFormPr
   const { account } = useAccount();
   // Use readable token amounts in the form (without decimals)
   const [amount, setAmount] = useState<string>('');
-  const [price, setPrice] = useState<string>('');
+  const [priceUsdc, setPriceUsdc] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [balance, setBalance] = useState<string>('0');
   const [formattedBalance, setFormattedBalance] = useState<string>('0');
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
+  const [usdcBalance, setUsdcBalance] = useState<string>('0');
+  const [isLoadingUsdcBalance, setIsLoadingUsdcBalance] = useState(false);
   
   const propertyTokenAddress = property?.tokenAddress || property?.propertyDetails?.associatedPropertyToken || '';
   
   // Load token balance for the user
   useEffect(() => {
-    const loadBalance = async () => {
-      if (!account || !propertyTokenAddress) return;
+    const loadBalances = async () => {
+      if (!account) return;
       
-      setIsLoadingBalance(true);
+      // Load property token balance
+      if (propertyTokenAddress) {
+        setIsLoadingBalance(true);
+        try {
+          // Get the raw balance in wei
+          const userBalance = await getTokenBalance(propertyTokenAddress, account);
+          setBalance(userBalance);
+          
+          // Format it to a human-readable number
+          const readableBalance = formatCurrency(userBalance);
+          setFormattedBalance(readableBalance);
+        } catch (err) {
+          console.error('Failed to load token balance:', err);
+          setBalance('0');
+          setFormattedBalance('0');
+        } finally {
+          setIsLoadingBalance(false);
+        }
+      }
+      
+      // Load USDC balance
+      setIsLoadingUsdcBalance(true);
       try {
-        // Get the raw balance in wei
-        const userBalance = await getTokenBalance(propertyTokenAddress, account);
-        setBalance(userBalance);
-        
-        // Format it to a human-readable number
-        const readableBalance = formatCurrency(userBalance);
-        setFormattedBalance(readableBalance);
+        const balance = await getUsdcBalance(account);
+        setUsdcBalance(balance);
       } catch (err) {
-        console.error('Failed to load token balance:', err);
-        setBalance('0');
-        setFormattedBalance('0');
+        console.error('Failed to load USDC balance:', err);
+        setUsdcBalance('0');
       } finally {
-        setIsLoadingBalance(false);
+        setIsLoadingUsdcBalance(false);
       }
     };
     
-    loadBalance();
+    loadBalances();
   }, [account, propertyTokenAddress]);
   
   // Handle setting max amount (convert to human readable format)
@@ -86,7 +103,22 @@ const CreateListingForm = ({ property, onSuccess, onError }: CreateListingFormPr
     // Only allow numeric input with decimals
     if (!/^\d*\.?\d*$/.test(value)) return;
     
-    setAmount(value);
+    // Ensure amount doesn't exceed available balance
+    const numValue = Number(value);
+    const maxBalance = Number(formattedBalance);
+    
+    if (numValue > maxBalance) {
+      setAmount(formattedBalance);
+    } else {
+      setAmount(value);
+    }
+  };
+  
+  // Calculate total value in USDC
+  const calculateTotalValueUsdc = (): string => {
+    if (!amount || !priceUsdc) return '';
+    const total = Number(amount) * Number(priceUsdc);
+    return total.toFixed(2);
   };
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -102,7 +134,7 @@ const CreateListingForm = ({ property, onSuccess, onError }: CreateListingFormPr
       return;
     }
     
-    if (!price || Number(price) <= 0) {
+    if (!priceUsdc || Number(priceUsdc) <= 0) {
       setError('Please enter a valid price per token');
       return;
     }
@@ -115,17 +147,15 @@ const CreateListingForm = ({ property, onSuccess, onError }: CreateListingFormPr
       // Convert human readable amount to wei for the smart contract
       const amountInWei = ethers.parseUnits(amount, 18).toString();
       
-      // Convert price to wei (assuming 18 decimals)
-      const priceInWei = ethers.parseUnits(price, 18).toString();
+      console.log(`Creating listing for ${amount} tokens (${amountInWei} wei) at $${priceUsdc} USDC per token`);
       
-      console.log(`Creating listing for ${amount} tokens (${amountInWei} wei) at ${price} ETH per token (${priceInWei} wei)`);
-      
-      const result = await createListing(propertyTokenAddress, amountInWei, priceInWei);
+      // Create listing directly with USDC price
+      const result = await createListing(propertyTokenAddress, amountInWei, priceUsdc);
       
       if (result.success) {
         setSuccess(true);
         setAmount('');
-        setPrice('');
+        setPriceUsdc('');
         if (onSuccess) onSuccess();
       } else {
         setError(result.error?.message || 'Failed to create listing');
@@ -170,27 +200,45 @@ const CreateListingForm = ({ property, onSuccess, onError }: CreateListingFormPr
               Loading balance...
             </span>
           ) : (
-            <>Your balance: {formattedBalance} tokens</>
+            <>Your balance: {formattedBalance} tokens (whole amount will be listed for sale)</>
           )}
         </p>
       </div>
       
       <div>
-        <Label htmlFor="price">Price per token (ETH)</Label>
+        <Label htmlFor="price" className="flex items-center">
+          <DollarSign className="h-3.5 w-3.5 mr-1" />
+          Price per token (USDC)
+        </Label>
         <Input
           id="price"
           type="text"
-          value={price}
+          value={priceUsdc}
           onChange={(e) => {
             // Only allow numeric input with decimals
             if (e.target.value === '' || /^\d*\.?\d*$/.test(e.target.value)) {
-              setPrice(e.target.value);
+              setPriceUsdc(e.target.value);
             }
           }}
-          placeholder="0.01"
+          placeholder="10.00"
           disabled={isSubmitting}
         />
-        <p className="text-xs text-gray-400 mt-1">Set your price in ETH per token</p>
+        <div className="flex justify-between text-xs text-gray-400 mt-1">
+          <span>Set your price in USDC per token</span>
+          <span>Your USDC balance: {isLoadingUsdcBalance ? 'Loading...' : usdcBalance}</span>
+        </div>
+        
+        {amount && Number(amount) > 0 && priceUsdc && Number(priceUsdc) > 0 && (
+          <div className="mt-3 p-2 bg-slate-800/50 rounded border border-slate-700/50">
+            <div className="flex justify-between items-center">
+              <span className="text-sm">Total value:</span>
+              <div className="flex items-center">
+                <DollarSign className="h-3.5 w-3.5 mr-0.5 text-green-400" />
+                <span className="font-medium text-green-400">${calculateTotalValueUsdc()} USDC</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       
       {error && (
@@ -210,7 +258,7 @@ const CreateListingForm = ({ property, onSuccess, onError }: CreateListingFormPr
       <Button 
         type="submit" 
         className="w-full crypto-btn"
-        disabled={isSubmitting || success || isLoadingBalance || balance === '0' || !validateAmount(amount)}
+        disabled={isSubmitting || success || isLoadingBalance || balance === '0' || !validateAmount(amount) || !priceUsdc}
       >
         {isSubmitting ? (
           <>
@@ -223,7 +271,10 @@ const CreateListingForm = ({ property, onSuccess, onError }: CreateListingFormPr
             Listing Created
           </>
         ) : (
-          'Create Listing'
+          <>
+            <DollarSign className="mr-1 h-4 w-4" />
+            Create USDC Listing
+          </>
         )}
       </Button>
     </form>

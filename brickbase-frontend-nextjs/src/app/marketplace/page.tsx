@@ -17,7 +17,11 @@ import { toast } from '@/components/ui/use-toast';
 import { Store } from 'lucide-react';
 import { ImageOff } from 'lucide-react';
 import { ethers } from 'ethers';
-import { tryConvertIpfsUrl } from '@/services/marketplace';
+import { tryConvertIpfsUrl, getActiveListings } from '@/services/marketplace';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { DialogFooter } from '@/components/ui/dialog';
+import { Slider } from '@/components/ui/slider';
 
 // Define interfaces for the marketplace data
 interface Listing {
@@ -47,7 +51,6 @@ interface EnrichedListing extends Listing {
   propertyDetails: PropertyMetadata | null;
   formattedPrice: string;
   formattedAmount: string;
-  usdPrice?: string; // For USD price display
 }
 
 // Helper function to extract attribute value with fallback
@@ -90,30 +93,28 @@ function shortenAddress(address: string): string {
   return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
 }
 
+// Helper function to format USDC amount (6 decimals)
+const formatUSDC = (amount: string): string => {
+  if (!amount) return '0.00';
+  try {
+    // USDC has 6 decimals
+    return ethers.formatUnits(amount, 6);
+  } catch (error) {
+    console.error('Error formatting USDC amount:', error);
+    return '0.00';
+  }
+};
+
 export default function MarketplacePage() {
   const { account, isConnected, connectWallet } = useAccount();
   const [listings, setListings] = useState<EnrichedListing[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedListing, setSelectedListing] = useState<EnrichedListing | null>(null);
-  const [ethUsdPrice, setEthUsdPrice] = useState<number | null>(null);
+  const [purchaseAmount, setPurchaseAmount] = useState('0.000001');
+  const [isPurchasing, setIsPurchasing] = useState(false);
   
   const apiUrl = 'http://localhost:3000'; // Your backend API URL
-  
-  // Fetch ETH to USD price
-  const fetchEthUsdPrice = async () => {
-    try {
-      const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd', {
-        signal: AbortSignal.timeout(15000), // 15 second timeout for price API
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setEthUsdPrice(data.ethereum.usd);
-      }
-    } catch (error) {
-      console.warn('Failed to fetch ETH/USD price:', error);
-    }
-  };
   
   const fetchPropertyDetails = async (listing: Listing): Promise<PropertyMetadata | null> => {
     try {
@@ -158,88 +159,65 @@ export default function MarketplacePage() {
   };
   
   const fetchListings = async () => {
+    setIsLoading(true);
+    setError(null);
     try {
-      setIsLoading(true);
-      setError(null);
-      
-      // 1. Fetch listings from marketplace
-      console.log("Fetching marketplace listings...");
-      
-      const response = await fetch(`${apiUrl}/marketplace/listings`, {
-        signal: AbortSignal.timeout(30000), // 30 second timeout
-        next: { revalidate: 300 } // Revalidate cache every 5 minutes
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch listings: ${response.status} ${response.statusText}`);
-      }
-      
-      // Get raw text first to debug
-      const responseText = await response.text();
-      console.log("Raw listings response:", responseText.substring(0, 200) + "...");
-      
-      // Parse the text to JSON manually to better handle errors
-      const rawListings = responseText ? JSON.parse(responseText) : [];
-      console.log(`Found ${rawListings.length} listings`);
-      
-      // 2. Enrich listings with property details
+      const listings = await getActiveListings();
+      console.log('Raw listings:', listings);
+
+      // Enrich listings with property details and format values
       const enrichedListings = await Promise.all(
-        rawListings.map(async (listing: Listing) => {
-          // Calculate formatted values for display
-          const formattedPrice = ethers.formatUnits(listing.pricePerToken, 18);
-          const formattedAmount = ethers.formatUnits(listing.amount, 18);
-          
-          // Calculate USD price if ETH price is available
-          let usdPrice = undefined;
-          if (ethUsdPrice) {
-            const ethPrice = parseFloat(formattedPrice);
-            usdPrice = (ethPrice * ethUsdPrice).toFixed(2);
+        listings.map(async (listing: any) => {
+          try {
+            const propertyDetails = await fetchPropertyDetails(listing);
+            
+            // Format price (USDC has 6 decimals)
+            const formattedPrice = formatUSDC(listing.pricePerToken);
+            
+            // Format token amount (ERC20 has 18 decimals)
+            const formattedAmount = ethers.formatUnits(listing.amount, 18);
+            
+            return {
+              ...listing,
+              propertyDetails,
+              formattedPrice,
+              formattedAmount,
+            };
+          } catch (error) {
+            console.error('Error enriching listing:', error);
+            // Return listing with error flag
+            return {
+              ...listing,
+              propertyDetails: null,
+              formattedPrice: formatUSDC(listing.pricePerToken),
+              formattedAmount: ethers.formatUnits(listing.amount, 18),
+            };
           }
-          
-          // Start with null property details
-          let propertyDetails = null;
-          
-          // Fetch property details for each listing
-          if (listing.tokenAddress) {
-            try {
-              console.log(`Fetching property details for token: ${listing.tokenAddress}`);
-              propertyDetails = await fetchPropertyDetails(listing);
-            } catch (err) {
-              console.error(`Error fetching property details for token ${listing.tokenAddress}:`, err);
-            }
-          }
-          
-          return {
-            ...listing,
-            propertyDetails,
-            formattedPrice,
-            formattedAmount,
-            usdPrice
-          };
         })
       );
       
+      console.log('Enriched listings:', enrichedListings);
       setListings(enrichedListings);
-    } catch (err: any) {
-      console.error("Error in fetchListings:", err);
-      setError(err.message || "Failed to fetch listings");
+    } catch (error: any) {
+      console.error('Error fetching listings:', error);
+      setError(error.message || 'Failed to fetch listings');
     } finally {
       setIsLoading(false);
     }
   };
   
   useEffect(() => {
-    // Fetch ETH/USD price first, then fetch listings
-    fetchEthUsdPrice().then(fetchListings);
-    
-    // Set up a refresh timer for ETH price
-    const priceRefreshInterval = setInterval(fetchEthUsdPrice, 60000); // Every minute
-    
-    return () => clearInterval(priceRefreshInterval);
+    fetchListings();
   }, []);
   
   const handleRefresh = () => {
-    fetchEthUsdPrice().then(fetchListings);
+    fetchListings();
+  };
+  
+  const handleListingSelect = (listing: EnrichedListing) => {
+    setSelectedListing(listing);
+    setPurchaseAmount('0.000001'); // Reset to minimum amount
+    setError(null);
   };
   
   const handlePurchaseSuccess = () => {
@@ -247,6 +225,56 @@ export default function MarketplacePage() {
     fetchListings();
     // Clear selected listing
     setSelectedListing(null);
+  };
+  
+  const handlePurchase = async () => {
+    if (!selectedListing || !purchaseAmount || parseFloat(purchaseAmount) <= 0 || parseFloat(purchaseAmount) > parseFloat(selectedListing.formattedAmount)) {
+      return;
+    }
+
+    try {
+      setIsPurchasing(true);
+      setError(null);
+
+      // Convert purchaseAmount to token amount with 18 decimals
+      const tokenAmount = ethers.parseUnits(purchaseAmount, 18);
+      const tokenAddress = selectedListing.tokenAddress;
+
+      console.log(`Making request to: ${apiUrl}/properties/buy/${tokenAddress}/${tokenAmount}`);
+      
+      const response = await fetch(`${apiUrl}/properties/buy/${tokenAddress}/${tokenAmount}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          account: account,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Property API returned status ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Purchase response:', data);
+
+      toast({
+        title: "Tokens purchased successfully!",
+        description: "Your tokens have been added to your wallet.",
+      });
+      handlePurchaseSuccess();
+    } catch (error: any) {
+      console.error("Error in handlePurchase:", error);
+      setError(error.message || "Failed to purchase tokens");
+      toast({
+        variant: "destructive",
+        title: "Transaction failed",
+        description: error.message || "There was an error processing your transaction.",
+      });
+    } finally {
+      setIsPurchasing(false);
+    }
   };
   
   const renderContent = () => {
@@ -331,9 +359,10 @@ export default function MarketplacePage() {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                     <Badge 
                       variant="outline" 
-                      className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm border-gray-500"
+                      className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm border-gray-500 flex items-center"
                     >
-                      {listing.formattedPrice} ETH
+                      <DollarSign className="h-3 w-3 mr-0.5 text-green-400" />
+                      <span className="text-green-400">${listing.formattedPrice} USDC</span>
                     </Badge>
                   </div>
                 ) : (
@@ -341,9 +370,10 @@ export default function MarketplacePage() {
                     <ImageOff className="h-10 w-10 text-gray-500" />
                     <Badge 
                       variant="outline" 
-                      className="absolute top-3 right-3 border-gray-500"
+                      className="absolute top-3 right-3 border-gray-500 flex items-center"
                     >
-                      {listing.formattedPrice} ETH
+                      <DollarSign className="h-3 w-3 mr-0.5 text-green-400" />
+                      <span className="text-green-400">${listing.formattedPrice} USDC</span>
                     </Badge>
                   </div>
                 )}
@@ -397,13 +427,10 @@ export default function MarketplacePage() {
                   <div className="flex justify-between items-center">
                     <span className="text-gray-400">Price per token:</span>
                     <div className="text-right">
-                      <span className="font-medium">{listing.formattedPrice} ETH</span>
-                      {listing.usdPrice && (
-                        <div className="text-xs text-gray-400 flex items-center justify-end">
-                          <DollarSign className="h-3 w-3 mr-0.5" />
-                          <span>${listing.usdPrice}</span>
-                        </div>
-                      )}
+                      <div className="flex items-center justify-end">
+                        <DollarSign className="h-3.5 w-3.5 mr-0.5 text-green-400" />
+                        <span className="font-medium text-green-400">${listing.formattedPrice} USDC</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -415,122 +442,272 @@ export default function MarketplacePage() {
                     <ArrowUpRight className="h-3 w-3 ml-1.5" />
                   </Button>
                 </Link>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button className="flex-[2] crypto-btn text-xs" size="sm">Buy Tokens</Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[500px]">
-                    <DialogHeader>
-                      <DialogTitle>
-                        {isPropertyDataValid ? propertyData.metadata?.name : 'Property Listing'}
-                      </DialogTitle>
-                      <DialogDescription>
-                        {isPropertyDataValid ? (
-                          propertyData.metadata?.description || 'No description available'
-                        ) : (
-                          'Property details are currently unavailable. You can still purchase tokens.'
-                        )}
-                      </DialogDescription>
-                    </DialogHeader>
-                    
-                    <div className="flex flex-col md:flex-row gap-4 py-4">
-                      <div className="md:w-1/3">
-                        <div className="relative h-48 w-full rounded-md overflow-hidden">
-                          {isPropertyDataValid && propertyData.metadata?.image ? (
-                            <Image
-                              src={tryConvertIpfsUrl(propertyData.metadata.image)}
-                              alt={propertyData.metadata.name || 'Property image'}
-                              fill
-                              className="object-cover"
-                              onError={(e) => {
-                                e.currentTarget.src = '/property-placeholder.jpg';
-                              }}
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-slate-800 flex items-center justify-center">
-                              <ImageOff className="h-8 w-8 text-gray-500" />
-                            </div>
-                          )}
-                        </div>
-                        
-                        <div className="flex flex-wrap gap-2 mt-3">
-                          {location && (
-                            <div className="flex items-center text-xs text-gray-400">
-                              <MapPin className="h-3 w-3 mr-1" />
-                              <span>{location}</span>
-                            </div>
-                          )}
-                        </div>
-                        
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {sqft > 0 && (
-                            <div className="flex items-center gap-1 text-xs bg-gray-800/80 px-2 py-1 rounded-full">
-                              <span>{sqft} sqft</span>
-                            </div>
-                          )}
-                          {bedrooms > 0 && (
-                            <div className="flex items-center gap-1 text-xs bg-gray-800/80 px-2 py-1 rounded-full">
-                              <span>{bedrooms} Bed</span>
-                            </div>
-                          )}
-                          {bathrooms > 0 && (
-                            <div className="flex items-center gap-1 text-xs bg-gray-800/80 px-2 py-1 rounded-full">
-                              <span>{bathrooms} Bath</span>
-                            </div>
-                          )}
-                        </div>
-                        
-                        <div className="mt-3">
-                          <Link href={`/properties/token/${listing.tokenAddress || 'unknown'}`} className="text-xs text-blue-400 hover:text-blue-300 flex items-center">
-                            View property details
-                            <ArrowUpRight className="h-3 w-3 ml-1" />
-                          </Link>
-                        </div>
-                      </div>
-                      
-                      <div className="md:w-2/3">
-                        <div className="bg-gray-800/50 p-3 rounded-md mb-4">
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-gray-300">Price per token:</span>
-                            <div className="text-right">
-                              <div>{listing.formattedPrice} ETH</div>
-                              {listing.usdPrice && (
-                                <div className="text-xs text-gray-400">≈ ${listing.usdPrice} USD</div>
+                <Button 
+                  className="flex-1"
+                  size="sm"
+                  onClick={() => handleListingSelect(listing)}
+                >
+                  Purchase Tokens
+                </Button>
+                <Dialog open={!!selectedListing && selectedListing.listingId === listing.listingId} onOpenChange={(open) => !open && setSelectedListing(null)}>
+                  {selectedListing && (
+                    <>
+                      <DialogContent className="sm:max-w-[700px] bg-gradient-to-br from-gray-900 to-gray-950 border-blue-900/50 rounded-xl backdrop-blur-lg shadow-xl">
+                        <DialogHeader>
+                          <DialogTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">Purchase Property Tokens</DialogTitle>
+                          <DialogDescription className="text-gray-300">
+                            Select how many tokens you would like to purchase for this property. You can use the slider or enter a precise amount.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                          {/* Property Preview Column */}
+                          <div className="space-y-4">
+                            <div className="aspect-square rounded-xl overflow-hidden relative border border-gray-800 bg-gray-900 shadow-lg">
+                              {selectedListing.propertyDetails?.metadata?.image ? (
+                                <Image
+                                  src={tryConvertIpfsUrl(selectedListing.propertyDetails.metadata.image)}
+                                  alt={selectedListing.propertyDetails?.metadata?.name || 'Property'}
+                                  fill
+                                  className="object-cover"
+                                  onError={(e) => {
+                                    e.currentTarget.src = '/property-placeholder.jpg';
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <ImageOff className="h-12 w-12 text-gray-600" />
+                                </div>
                               )}
+                              
+                              {/* Futuristic overlay elements */}
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+                              <div className="absolute bottom-0 left-0 right-0 p-3">
+                                <div className="text-xs font-mono text-blue-400 mb-1 flex items-center">
+                                  <span className="inline-block w-2 h-2 rounded-full bg-blue-400 mr-1 animate-pulse"></span>
+                                  PROPERTY ID: {selectedListing.tokenId.substring(0, 8)}...
+                                </div>
+                                <div className="text-white font-semibold truncate">
+                                  {selectedListing.propertyDetails?.metadata?.name || 'Property'}
+                                </div>
+                              </div>
+                              
+                              {/* Token badge */}
+                              <div className="absolute top-3 left-3 font-mono text-xs bg-blue-500/20 border border-blue-500/30 text-blue-300 px-2 py-1 rounded-lg backdrop-blur-sm">
+                                NFT #{selectedListing.tokenId}
+                              </div>
+                            </div>
+                            
+                            {/* Property info */}
+                            <div className="bg-gray-800/30 backdrop-blur p-4 rounded-xl border border-gray-700/50">
+                              <h4 className="text-sm font-medium text-gray-300 mb-2">Property Details</h4>
+                              
+                              <div className="space-y-2 text-sm">
+                                {selectedListing.propertyDetails?.metadata?.attributes && (
+                                  <>
+                                    {getAttributeValue(selectedListing.propertyDetails.metadata.attributes, 'Address') && (
+                                      <div className="flex items-center gap-2 text-gray-400">
+                                        <MapPin className="h-3.5 w-3.5 text-gray-500" />
+                                        <span className="truncate">
+                                          {getAttributeValue(selectedListing.propertyDetails.metadata.attributes, 'Address', 'Location not specified')}
+                                        </span>
+                                      </div>
+                                    )}
+                                    
+                                    <div className="grid grid-cols-2 gap-2">
+                                      {getAttributeValue(selectedListing.propertyDetails.metadata.attributes, 'Square Footage') && (
+                                        <div className="flex items-center gap-1 text-xs">
+                                          <Building2 className="h-3 w-3 text-gray-500" />
+                                          <span>{getAttributeValue(selectedListing.propertyDetails.metadata.attributes, 'Square Footage', '0')} sqft</span>
+                                        </div>
+                                      )}
+                                      
+                                      {getAttributeValue(selectedListing.propertyDetails.metadata.attributes, 'Bedrooms') && (
+                                        <div className="flex items-center gap-1 text-xs">
+                                          <Tag className="h-3 w-3 text-gray-500" />
+                                          <span>{getAttributeValue(selectedListing.propertyDetails.metadata.attributes, 'Bedrooms', '0')} Beds</span>
+                                        </div>
+                                      )}
+                                      
+                                      {getAttributeValue(selectedListing.propertyDetails.metadata.attributes, 'Bathrooms') && (
+                                        <div className="flex items-center gap-1 text-xs">
+                                          <Tag className="h-3 w-3 text-gray-500" />
+                                          <span>{getAttributeValue(selectedListing.propertyDetails.metadata.attributes, 'Bathrooms', '0')} Baths</span>
+                                        </div>
+                                      )}
+                                      
+                                      {getAttributeValue(selectedListing.propertyDetails.metadata.attributes, 'Property Type') && (
+                                        <div className="flex items-center gap-1 text-xs">
+                                          <Tag className="h-3 w-3 text-gray-500" />
+                                          <span>{getAttributeValue(selectedListing.propertyDetails.metadata.attributes, 'Property Type', 'Not specified')}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </>
+                                )}
+                                
+                                <div className="flex justify-between border-t border-gray-700/50 pt-2 mt-2">
+                                  <span className="text-xs text-gray-500">Listed by:</span>
+                                  <a href={`https://basescan.org/address/${selectedListing.seller}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 flex items-center">
+                                    {shortenAddress(selectedListing.seller)}
+                                    <ExternalLink className="h-3 w-3 ml-1" />
+                                  </a>
+                                </div>
+                              </div>
                             </div>
                           </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-gray-300">Available tokens:</span>
-                            <span>{listing.formattedAmount}</span>
+                          
+                          {/* Purchase Form Column */}
+                          <div className="space-y-5">
+                            <div className="bg-blue-900/10 p-4 rounded-xl border border-blue-900/20 backdrop-blur-md">
+                              <div className="flex justify-between items-center mb-2">
+                                <span className="text-sm font-medium text-gray-300">Price per token:</span>
+                                <span className="text-green-400 font-semibold flex items-center text-lg">
+                                  <DollarSign className="h-4 w-4 mr-0.5" />
+                                  ${selectedListing.formattedPrice} <span className="text-xs ml-1 text-green-500">USDC</span>
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-medium text-gray-300">Available:</span>
+                                <span className="font-semibold flex items-center gap-1">
+                                  <span>{selectedListing.formattedAmount}</span>
+                                  <span className="text-xs text-gray-400">tokens</span>
+                                </span>
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-4">
+                              <div>
+                                <Label htmlFor="tokenAmount" className="text-sm mb-2 block font-medium text-gray-200">
+                                  Amount to purchase
+                                </Label>
+                                <div className="flex items-center gap-3">
+                                  <div className="relative flex-grow">
+                                    <DollarSign className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-400" />
+                                    <Input
+                                      id="tokenAmount"
+                                      type="number"
+                                      min="0.000001"
+                                      step="0.000001"
+                                      max={selectedListing.formattedAmount}
+                                      value={purchaseAmount}
+                                      onChange={(e) => setPurchaseAmount(e.target.value)}
+                                      className="pl-9 pr-16 bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                    />
+                                    <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">
+                                      tokens
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div>
+                                <Label className="text-sm mb-2 block font-medium text-gray-200">Adjust amount</Label>
+                                <Slider
+                                  value={[parseFloat(purchaseAmount)]}
+                                  max={parseFloat(selectedListing.formattedAmount)}
+                                  min={0.000001}
+                                  step={0.000001}
+                                  onValueChange={(values) => setPurchaseAmount(values[0].toString())}
+                                  className="my-4"
+                                />
+                                <div className="flex justify-between items-center gap-2 mt-3">
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={() => setPurchaseAmount((parseFloat(selectedListing.formattedAmount) * 0.25).toFixed(6))}
+                                    className="flex-1 h-8 border-gray-700 hover:bg-blue-900/20 hover:text-blue-300"
+                                  >
+                                    25%
+                                  </Button>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={() => setPurchaseAmount((parseFloat(selectedListing.formattedAmount) * 0.5).toFixed(6))}
+                                    className="flex-1 h-8 border-gray-700 hover:bg-blue-900/20 hover:text-blue-300"
+                                  >
+                                    50%
+                                  </Button>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={() => setPurchaseAmount((parseFloat(selectedListing.formattedAmount) * 0.75).toFixed(6))}
+                                    className="flex-1 h-8 border-gray-700 hover:bg-blue-900/20 hover:text-blue-300"
+                                  >
+                                    75%
+                                  </Button>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={() => setPurchaseAmount(selectedListing.formattedAmount)}
+                                    className="flex-1 h-8 border-gray-700 hover:bg-blue-900/20 hover:text-blue-300"
+                                  >
+                                    Max
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="bg-blue-900/20 border border-blue-800/30 rounded-xl p-4 backdrop-blur-md">
+                              <h4 className="font-medium mb-3 flex items-center text-blue-300 text-sm">
+                                <span>Purchase Summary</span>
+                              </h4>
+                              <div className="grid grid-cols-2 gap-3 text-sm">
+                                <span className="text-gray-300">Tokens to buy:</span>
+                                <span className="text-right font-medium">{purchaseAmount}</span>
+                                
+                                <span className="text-gray-300">Price per token:</span>
+                                <span className="text-right font-medium">${selectedListing.formattedPrice} USDC</span>
+                                
+                                <span className="text-gray-300 font-medium pt-2 border-t border-blue-800/30">Total cost:</span>
+                                <span className="text-right font-bold text-green-400 pt-2 border-t border-blue-800/30 flex items-center justify-end">
+                                  <DollarSign className="h-3.5 w-3.5 mr-0.5" />
+                                  ${(parseFloat(selectedListing.formattedPrice) * parseFloat(purchaseAmount || "0")).toFixed(6)}
+                                  <span className="text-xs ml-1 text-green-500">USDC</span>
+                                </span>
+                              </div>
+                              
+                              <div className="mt-4 text-xs text-gray-400 flex items-start gap-2">
+                                <AlertCircle className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                                <span>
+                                  Purchasing tokens makes you a fractional owner of this property, entitling you 
+                                  to a proportional share of rental income and voting rights.
+                                </span>
+                              </div>
+                            </div>
+                            
+                            {error && (
+                              <div className="bg-red-900/30 border border-red-800 text-red-300 px-4 py-3 rounded-xl text-sm" role="alert">
+                                <div className="flex items-center gap-2">
+                                  <AlertCircle className="h-4 w-4" />
+                                  <span>{error}</span>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                         
-                        <BuyTokensForm 
-                          listing={{
-                            id: listing.listingId.toString(),
-                            seller: listing.seller,
-                            tokenAmount: listing.amount,
-                            pricePerToken: listing.pricePerToken,
-                            ethUsdPrice: ethUsdPrice || undefined
-                          }}
-                          onSuccess={() => {
-                            toast({
-                              title: "Tokens purchased successfully!",
-                              description: "Your tokens have been added to your wallet.",
-                            });
-                            handlePurchaseSuccess();
-                          }}
-                          onError={(error) => {
-                            toast({
-                              variant: "destructive",
-                              title: "Transaction failed",
-                              description: error?.message || "There was an error processing your transaction.",
-                            });
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </DialogContent>
+                        <DialogFooter className="flex gap-3 sm:gap-0 mt-2 pt-4 border-t border-gray-800">
+                          <Button variant="outline" onClick={() => setSelectedListing(null)} className="border-gray-700 hover:bg-gray-800">
+                            Cancel
+                          </Button>
+                          <Button 
+                            onClick={handlePurchase} 
+                            disabled={isPurchasing || !purchaseAmount || parseFloat(purchaseAmount) <= 0 || parseFloat(purchaseAmount) > parseFloat(selectedListing.formattedAmount)}
+                            className={`bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white ${isPurchasing ? "opacity-80" : ""}`}
+                          >
+                            {isPurchasing ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Processing...
+                              </>
+                            ) : (
+                              <>Confirm Purchase</>
+                            )}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </>
+                  )}
                 </Dialog>
               </CardFooter>
             </Card>
@@ -548,16 +725,7 @@ export default function MarketplacePage() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12">
           <div className="mb-6 md:mb-0">
             <h1 className="text-3xl font-bold mb-2">Property <span className="text-gradient">Marketplace</span></h1>
-            <p className="text-gray-400">Buy and sell fractional property tokens</p>
-          </div>
-          
-          <div className="flex flex-col sm:flex-row gap-4">
-            {ethUsdPrice && (
-              <div className="text-sm bg-green-900/30 px-4 py-2 rounded-md border border-green-500/30 flex items-center">
-                <DollarSign className="h-4 w-4 mr-1 text-green-400" />
-                <span className="text-green-400">1 ETH = ${ethUsdPrice}</span>
-              </div>
-            )}
+            <p className="text-gray-400">Buy and sell fractional property tokens with USDC</p>
           </div>
         </div>
         
