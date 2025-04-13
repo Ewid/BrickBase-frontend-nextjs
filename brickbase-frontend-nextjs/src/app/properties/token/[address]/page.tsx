@@ -12,7 +12,7 @@ import { PropertyDto } from '@/types/dtos';
 import { formatUnits } from 'ethers';
 import { useAccount } from '@/hooks/useAccount';
 import CreateListingForm from '@/components/CreateListingForm';
-import { getPropertyByNFTAddress } from '@/services/property';
+import { getPropertyByTokenAddress } from '@/services/property';
 import { tryConvertIpfsUrl } from '@/services/marketplace';
 
 // Mock property data for fallback when API fails
@@ -40,9 +40,6 @@ const MOCK_PROPERTY: PropertyDto = {
   }
 };
 
-// We don't need separate mock metadata since it's included in the property response
-const MOCK_METADATA = MOCK_PROPERTY.metadata;
-
 // Helper function to fetch IPFS metadata (simplified since metadata is now in the direct API response)
 async function fetchImageFromIpfs(ipfsUrl: string): Promise<string | null> {
   if (!ipfsUrl || !ipfsUrl.startsWith('ipfs://')) {
@@ -65,12 +62,10 @@ const DEFAULT_PROPERTY_DETAILS = {
   associatedPropertyToken: 'Not available'
 };
 
-const PropertyDetailPage = () => {
+const TokenPropertyDetailPage = () => {
   const params = useParams();
-  const rawPropertyAddress = params?.id as string | undefined;
+  const tokenAddress = params?.address as string | undefined;
   const { isConnected } = useAccount();
-
-  // Use our custom hook to validate and normalize the address
 
   const [property, setProperty] = useState<PropertyDto | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -81,22 +76,18 @@ const PropertyDetailPage = () => {
 
   useEffect(() => {
     const fetchPropertyDetails = async () => {
-      if (!rawPropertyAddress) {
-        setError('Property address not found or invalid.');
+      if (!tokenAddress) {
+        setError('Token address not found or invalid.');
         setIsLoading(false);
         return;
       }
 
-      // Even if the address doesn't pass ethers validation, try to use it
-      // as some systems don't require proper checksum addresses
-      const addressToUse =  rawPropertyAddress;
-
       setIsLoading(true);
       setError(null);
       try {
-        // Use our service function instead of direct API call
-        const data = await getPropertyByNFTAddress(addressToUse);
-        console.log("Property data from API:", data);
+        // Use token-based property fetch
+        const data = await getPropertyByTokenAddress(tokenAddress);
+        console.log("Property data from API (token lookup):", data);
         
         // Ensure propertyDetails exists (create it if not present)
         if (!data.propertyDetails) {
@@ -107,7 +98,7 @@ const PropertyDetailPage = () => {
             bathrooms: 0,
             yearBuilt: 0,
             propertyType: 'Unknown',
-            associatedPropertyToken: ''
+            associatedPropertyToken: tokenAddress
           };
         }
         
@@ -126,14 +117,17 @@ const PropertyDetailPage = () => {
         }
 
       } catch (err: any) {
-        console.error("Failed to fetch property details:", err);
+        console.error("Failed to fetch property details by token:", err);
         setError(err.message || 'Failed to load property details.');
         
-        // Create customized mock data that matches the property ID
+        // Create customized mock data that matches the token address
         const customMockProperty = {
           ...MOCK_PROPERTY,
-          id: addressToUse,
-          tokenId: parseInt(addressToUse.substring(2, 6), 16) % 100 // Use part of the address as a deterministic token ID
+          tokenAddress: tokenAddress,
+          propertyDetails: {
+            ...MOCK_PROPERTY.propertyDetails,
+            associatedPropertyToken: tokenAddress
+          }
         };
         
         // Use mock data if API call fails
@@ -148,7 +142,7 @@ const PropertyDetailPage = () => {
     };
 
     fetchPropertyDetails();
-  }, [rawPropertyAddress, useMockData]);
+  }, [tokenAddress, useMockData]);
 
   const handleListingSuccess = () => {
     // Close the modal after successful listing creation
@@ -157,9 +151,6 @@ const PropertyDetailPage = () => {
 
   // Safe access to property details
   const propertyDetails = property?.propertyDetails || DEFAULT_PROPERTY_DETAILS;
-  
-  // Get token address
-  const tokenAddress = property?.tokenAddress || propertyDetails.associatedPropertyToken;
 
   if (isLoading) {
     return (
@@ -213,9 +204,24 @@ const PropertyDetailPage = () => {
   const getAttributeValue = (attrName: string, defaultValue: string = 'Not specified') => {
     if (!property?.metadata?.attributes) return defaultValue;
     
+    // Create an array of possible names to check for (to handle different naming conventions)
+    const possibleNames = [attrName];
+    
+    // Add alternate names based on the attribute we're looking for
+    if (attrName === 'Bedrooms') possibleNames.push('Beds');
+    if (attrName === 'Bathrooms') possibleNames.push('Baths');
+    if (attrName === 'Square Footage') possibleNames.push('sqft', 'Sqft');
+    if (attrName === 'Year Built') possibleNames.push('YearBuilt', 'Year');
+    if (attrName === 'Property Type') possibleNames.push('Type');
+    if (attrName === 'Address') possibleNames.push('Location', 'location', 'address');
+    
+    // Look for any matching attribute
     const attr = property.metadata.attributes.find(
-      attr => attr.trait_type?.toLowerCase() === attrName.toLowerCase()
+      attr => possibleNames.some(name => 
+        attr.trait_type?.toLowerCase() === name.toLowerCase()
+      )
     );
+    
     return attr?.value?.toString() || defaultValue;
   };
   
@@ -228,8 +234,6 @@ const PropertyDetailPage = () => {
   const bathrooms = getAttributeValue('Bathrooms', propertyDetails.bathrooms?.toString() || '0');
   const yearBuilt = getAttributeValue('Year Built', propertyDetails.yearBuilt?.toString() || '0');
   const propertyType = getAttributeValue('Property Type', propertyDetails.propertyType || 'Unknown');
-  
-  // Get formatted address for display
 
   return (
     <div className="min-h-screen bg-crypto-dark">
@@ -375,4 +379,4 @@ const PropertyDetailPage = () => {
   );
 };
 
-export default PropertyDetailPage; 
+export default TokenPropertyDetailPage; 

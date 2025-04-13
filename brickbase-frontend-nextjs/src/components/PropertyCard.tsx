@@ -4,30 +4,16 @@ import Image from 'next/image';
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Building2, MapPin, Maximize2, Bitcoin, Tag, Info, AlertTriangle } from "lucide-react";
+import { tryConvertIpfsUrl } from '@/services/marketplace';
 
 // Sample image URL for fallback when images fail to load
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1560518883-ce09059eeffa?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8cHJvcGVydHl8ZW58MHx8MHx8&auto=format&fit=crop&w=800&q=60";
-
-// Helper to convert IPFS URL to HTTP Gateway URL
-const ipfsToGatewayUrl = (ipfsUrl: string): string => {
-  if (!ipfsUrl || typeof ipfsUrl !== 'string') {
-    return FALLBACK_IMAGE; // Return fallback for undefined/null or non-string values
-  }
-  
-  if (!ipfsUrl.startsWith('ipfs://')) {
-    // It's already an HTTP URL or another format
-    return ipfsUrl;
-  }
-  
-  // Use gateway.pinata.cloud which is faster than ipfs.io
-  const cid = ipfsUrl.replace('ipfs://', '');
-  return `https://gateway.pinata.cloud/ipfs/${cid}`;
-};
 
 // Update the interface to handle both old and new property formats
 interface PropertyCardProps {
   id: number; // This represents tokenId from backend DTO
   nftAddress?: string; // Property NFT address (for linking)
+  tokenAddress?: string; // NEW: Property token address for token operations
   title: string;
   location: string;
   price?: string;
@@ -40,6 +26,7 @@ interface PropertyCardProps {
 const PropertyCard = ({ 
   id, // tokenId
   nftAddress, // The actual address to link to
+  tokenAddress, // NEW: Property token address for token operations
   title, 
   location, 
   price, 
@@ -49,31 +36,22 @@ const PropertyCard = ({
   featured = false 
 }: PropertyCardProps) => {
 
-  const httpImageUrl = ipfsToGatewayUrl(imageUrl); // Convert IPFS URL
+  const httpImageUrl = imageUrl ? tryConvertIpfsUrl(imageUrl) : FALLBACK_IMAGE; // Convert IPFS URL
   const [imgSrc, setImgSrc] = useState(httpImageUrl);
   const [imgError, setImgError] = useState(false);
   const [addressError, setAddressError] = useState(false);
   
   // Reset error state when imageUrl or nftAddress changes
   useEffect(() => {
-    setImgSrc(ipfsToGatewayUrl(imageUrl));
+    setImgSrc(imageUrl ? tryConvertIpfsUrl(imageUrl) : FALLBACK_IMAGE);
     setImgError(false);
     setAddressError(!nftAddress);
   }, [imageUrl, nftAddress]);
   
   const handleImageError = () => {
-    // First try IPFS.io if primary gateway fails
-    if (imageUrl?.startsWith('ipfs://') && !imgError) {
-      const cid = imageUrl.replace('ipfs://', '');
-      setImgSrc(`https://ipfs.io/ipfs/${cid}`);
-      setImgError(true);
-      return;
-    }
-    
-    // If all else fails, use a fallback image
-    if (imgError) {
-      setImgSrc(FALLBACK_IMAGE);
-    }
+    // Use fallback image
+    setImgSrc(FALLBACK_IMAGE);
+    setImgError(true);
   };
 
   const renderPriceSection = () => {
@@ -92,23 +70,28 @@ const PropertyCard = ({
         <div className="text-sm text-gray-400 italic flex items-center">
            <Info className="h-4 w-4 mr-1 text-blue-400" /> 
            <span>Details via View Property</span>
+           {tokenAddress && (
+             <span className="ml-1 text-xs text-green-400" title="Tokenized property">•</span>
+           )}
         </div>
       );
     }
   };
 
-  // Ensure the NFT address is valid and normalize it
+  // Ensure the addresses are valid and normalize them
   const validNftAddress = nftAddress && nftAddress.startsWith('0x') ? nftAddress : undefined;
+  const validTokenAddress = tokenAddress && tokenAddress.startsWith('0x') ? tokenAddress : undefined;
 
-  // Determine the link destination
-  const linkHref = validNftAddress ? `/properties/${validNftAddress}` : '#'; // Link to address if available
+  // Always use the token route, with either token address or NFT address as fallback
+  const addressToUse = validTokenAddress || validNftAddress;
+  const linkHref = addressToUse ? `/properties/token/${addressToUse}` : '#';
 
   // Function to handle click on disabled cards
   const handleDisabledClick = (e: React.MouseEvent) => {
-    if (!validNftAddress) {
+    if (!addressToUse) {
       e.preventDefault();
       // Optional: Could add a toast notification here
-      console.warn('Cannot view property: NFT address is missing or invalid');
+      console.warn('Cannot view property: No valid address available');
       setAddressError(true);
     }
   };
@@ -166,10 +149,10 @@ const PropertyCard = ({
             <span>Invalid property address</span>
           </div>
         )}
-        <Link href={linkHref} className={`w-full ${!validNftAddress ? 'pointer-events-none opacity-70' : ''}`} onClick={handleDisabledClick}> 
+        <Link href={linkHref} className={`w-full ${!addressToUse ? 'pointer-events-none opacity-70' : ''}`} onClick={handleDisabledClick}> 
           <Button 
             className="w-full bg-crypto-dark hover:bg-crypto-dark/80 border border-crypto-light/30 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={!validNftAddress} // Disable button if no address
+            disabled={!addressToUse} // Enable button if either address is available
            > 
             <Tag className="mr-2 h-4 w-4" />
             View Property

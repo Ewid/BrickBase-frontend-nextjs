@@ -24,6 +24,10 @@ export interface ListingDto {
     tokenSymbol?: string;
     propertyAddress?: string;
   };
+  propertyDetails?: PropertyDto | null;  // Optional enriched property data
+  formattedPrice?: string;  // Formatted price for display
+  formattedAmount?: string; // Formatted amount for display
+  usdPrice?: string;        // USD equivalent price
 }
 
 export interface PriceHistoryDto {
@@ -41,49 +45,44 @@ export interface PriceHistoryDto {
 // --- Properties DTOs ---
 
 export interface PropertyDto {
-  id: string; // Changed from nftAddress to id to match backend data
-  tokenId: number;
+  id: string;              // The NFT Contract Address
+  tokenId: number;         // The NFT token ID
+  tokenAddress?: string;   // Property's specific ERC20 token address
   metadata: {
     name: string;
     description: string;
     image: string;
     attributes: Array<{
       trait_type: string;
-      value: any;
+      value: string | number;
     }>;
   };
-  totalSupply?: string; // Added as it's in the backend response
-  tokenUri?: string; // Made optional as it's not in the backend response
-  owner?: string; // Made optional as it's not in the backend response
+  totalSupply: string;     // Total supply of tokens
   propertyDetails?: {
-    physicalAddress: string;
-    sqft: number;
-    bedrooms: number;
-    bathrooms: number;
-    yearBuilt: number;
-    propertyType: string;
-    associatedPropertyToken: string;
+    physicalAddress?: string;
+    sqft?: number;
+    bedrooms?: number;
+    bathrooms?: number;
+    yearBuilt?: number;
+    propertyType?: string;
+    associatedPropertyToken?: string;
   };
 }
 
 // --- DAO DTOs ---
 
 export interface ProposalDto {
-  id: number; // Corresponds to proposal index
-  proposer: string;
-  description: string;
-  targetContract: string;
-  functionCallData: string;
-  createdAt: Date;
-  startBlock: string; // BigInt as string
-  endBlock: string; // BigInt as string
-  forVotes: string; // BigInt as string
-  againstVotes: string; // BigInt as string
-  abstainVotes: string; // BigInt as string
-  isExecuted: boolean;
-  isCancelled: boolean;
-  currentState?: string; // Optional: Populate with getProposalState
-  // Add other fields from backend entity if needed
+  id: number;
+  proposer: string;         // Address of proposer
+  description: string;      // Description of proposal
+  targetContract: string;   // Contract to call if passed
+  functionCall: string;     // Call data for the target contract
+  votesFor: string;         // Total votes in favor (big number string)
+  votesAgainst: string;     // Total votes against (big number string)
+  startTime: number;        // When voting starts
+  endTime: number;          // When voting ends
+  executed: boolean;        // Whether executed yet
+  passed: boolean;          // Whether passed or failed
 }
 
 export interface ExpenseRecordDto {
@@ -144,4 +143,23 @@ export interface TransactionResponse {
   transaction?: any;
   error?: any;
   listingId?: string;
+}
+
+// Rent Distribution DTO
+export interface RentDto {
+  propertyTokenAddress: string;  // Property token address
+  userAddress: string;           // User address
+  claimableAmount: string;       // Claimable rent amount (big number string)
+  lastClaimTime: number;         // Last time rent was claimed
+  formattedAmount?: string;      // Formatted amount for display
+}
+
+// User Token Balance DTO
+export interface TokenBalanceDto {
+  tokenAddress: string;      // Token contract address
+  propertyName?: string;     // Property name for display
+  propertyId?: string;       // NFT property ID
+  balance: string;           // User's token balance (big number string)
+  formattedBalance?: string; // Formatted balance for display
+  percentage?: number;       // Ownership percentage
 } 

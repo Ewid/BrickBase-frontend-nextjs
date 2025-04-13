@@ -59,11 +59,24 @@ const getAttributeValue = (attributes: any, traitType: string, defaultValue: any
     return attributes[traitType];
   }
   
+  // Create an array of possible names to check for (to handle different naming conventions)
+  const possibleNames = [traitType];
+  
+  // Add alternate names based on the attribute we're looking for
+  if (traitType === 'Bedrooms') possibleNames.push('Beds');
+  if (traitType === 'Bathrooms') possibleNames.push('Baths');
+  if (traitType === 'Square Footage') possibleNames.push('sqft', 'Sqft');
+  if (traitType === 'Year Built') possibleNames.push('YearBuilt', 'Year');
+  if (traitType === 'Property Type') possibleNames.push('Type');
+  if (traitType === 'Address') possibleNames.push('Location', 'location', 'address');
+  
   // Try array format (trait_type/value pairs)
   if (Array.isArray(attributes)) {
     const attr = attributes.find((attr: any) => 
-      attr.trait_type === traitType || 
-      attr.trait_type?.toLowerCase() === traitType.toLowerCase()
+      possibleNames.some(name => 
+        attr.trait_type === name || 
+        attr.trait_type?.toLowerCase() === name.toLowerCase()
+      )
     );
     return attr ? attr.value : defaultValue;
   }
@@ -90,7 +103,9 @@ export default function MarketplacePage() {
   // Fetch ETH to USD price
   const fetchEthUsdPrice = async () => {
     try {
-      const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
+      const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd', {
+        signal: AbortSignal.timeout(15000), // 15 second timeout for price API
+      });
       if (response.ok) {
         const data = await response.json();
         setEthUsdPrice(data.ethereum.usd);
@@ -100,18 +115,15 @@ export default function MarketplacePage() {
     }
   };
   
-  const fetchPropertyDetails = async (nftAddress: string): Promise<PropertyMetadata | null> => {
+  const fetchPropertyDetails = async (listing: Listing): Promise<PropertyMetadata | null> => {
     try {
-      console.log(`Making request to: ${apiUrl}/properties/${nftAddress}`);
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      const tokenAddress = listing.tokenAddress;
+      console.log(`Making request to: ${apiUrl}/properties/token/${tokenAddress}`);
       
-      const response = await fetch(`${apiUrl}/properties/${nftAddress}`, {
-        signal: controller.signal,
+      const response = await fetch(`${apiUrl}/properties/token/${tokenAddress}`, {
+        signal: AbortSignal.timeout(30000), // 30 second timeout
         next: { revalidate: 300 } // Revalidate cache every 5 minutes
       });
-      
-      clearTimeout(timeoutId);
       
       if (!response.ok) {
         throw new Error(`Property API returned status ${response.status}`);
@@ -119,7 +131,7 @@ export default function MarketplacePage() {
       
       // Get raw response text first
       const responseText = await response.text();
-      console.log(`Raw property response for ${nftAddress}:`, 
+      console.log(`Raw property response for token ${tokenAddress}:`, 
                  responseText ? (responseText.length > 200 ? 
                                 responseText.substring(0, 200) + "..." : 
                                 responseText) : 
@@ -127,7 +139,7 @@ export default function MarketplacePage() {
       
       // Handle empty response
       if (!responseText || responseText.trim() === '') {
-        console.warn(`Empty response from property API for ${nftAddress}`);
+        console.warn(`Empty response from property API for token ${tokenAddress}`);
         return null;
       }
       
@@ -140,7 +152,7 @@ export default function MarketplacePage() {
         return null;
       }
     } catch (error: any) {
-      console.error(`Error fetching property ${nftAddress}:`, error);
+      console.error(`Error fetching property for token ${listing.tokenAddress}:`, error);
       return null;
     }
   };
@@ -152,15 +164,11 @@ export default function MarketplacePage() {
       
       // 1. Fetch listings from marketplace
       console.log("Fetching marketplace listings...");
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
       const response = await fetch(`${apiUrl}/marketplace/listings`, {
-        signal: controller.signal,
+        signal: AbortSignal.timeout(30000), // 30 second timeout
         next: { revalidate: 300 } // Revalidate cache every 5 minutes
       });
-      
-      clearTimeout(timeoutId);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch listings: ${response.status} ${response.statusText}`);
@@ -192,12 +200,12 @@ export default function MarketplacePage() {
           let propertyDetails = null;
           
           // Fetch property details for each listing
-          if (listing.nftAddress) {
+          if (listing.tokenAddress) {
             try {
-              console.log(`Fetching property details for NFT: ${listing.nftAddress}`);
-              propertyDetails = await fetchPropertyDetails(listing.nftAddress);
+              console.log(`Fetching property details for token: ${listing.tokenAddress}`);
+              propertyDetails = await fetchPropertyDetails(listing);
             } catch (err) {
-              console.error(`Error fetching property details for NFT ${listing.nftAddress}:`, err);
+              console.error(`Error fetching property details for token ${listing.tokenAddress}:`, err);
             }
           }
           
@@ -299,19 +307,12 @@ export default function MarketplacePage() {
           // Extract property details
           const attributes = isPropertyDataValid ? propertyData.metadata?.attributes : null;
           
-          // Look for both "location" and "Address" trait types for location information
-          const location = getAttributeValue(attributes, 'Address', '') || 
-                          getAttributeValue(attributes, 'address', '') || 
-                          getAttributeValue(attributes, 'location', 'Location not specified');
-          
-          const sqft = getAttributeValue(attributes, 'Square Footage', 0) || 
-                     getAttributeValue(attributes, 'sqft', 0);
-          const bedrooms = getAttributeValue(attributes, 'bedrooms', 0) || 
-                         getAttributeValue(attributes, 'Bedrooms', 0);
-          const bathrooms = getAttributeValue(attributes, 'bathrooms', 0) || 
-                          getAttributeValue(attributes, 'Bathrooms', 0);
-          const propertyType = getAttributeValue(attributes, 'Property Type', '') || 
-                             getAttributeValue(attributes, 'propertyType', 'Not specified');
+          // Use our enhanced getAttributeValue function that handles multiple naming conventions
+          const location = getAttributeValue(attributes, 'Address', 'Location not specified');
+          const sqft = getAttributeValue(attributes, 'Square Footage', 0);
+          const bedrooms = getAttributeValue(attributes, 'Bedrooms', 0);
+          const bathrooms = getAttributeValue(attributes, 'Bathrooms', 0);
+          const propertyType = getAttributeValue(attributes, 'Property Type', 'Not specified');
           
           return (
             <Card key={listing.listingId} className="overflow-hidden h-full flex flex-col border-gray-800 hover:border-gray-700 transition-colors">
@@ -408,7 +409,7 @@ export default function MarketplacePage() {
                 </div>
               </CardContent>
               <CardFooter className="p-4 pt-0 flex gap-2">
-                <Link href={`/properties/${listing.nftAddress || 'unknown'}`} className="flex-1">
+                <Link href={`/properties/token/${listing.tokenAddress || 'unknown'}`} className="flex-1">
                   <Button variant="outline" className="w-full text-xs" size="sm">
                     View Property
                     <ArrowUpRight className="h-3 w-3 ml-1.5" />
@@ -480,7 +481,7 @@ export default function MarketplacePage() {
                         </div>
                         
                         <div className="mt-3">
-                          <Link href={`/properties/${listing.nftAddress || 'unknown'}`} className="text-xs text-blue-400 hover:text-blue-300 flex items-center">
+                          <Link href={`/properties/token/${listing.tokenAddress || 'unknown'}`} className="text-xs text-blue-400 hover:text-blue-300 flex items-center">
                             View property details
                             <ArrowUpRight className="h-3 w-3 ml-1" />
                           </Link>
