@@ -90,10 +90,11 @@ const FeaturedProperties = () => {
         key={property.tokenId}
         id={Number(property.tokenId) || 0}
         nftAddress={property.id}
+        tokenAddress={property.tokenAddress || property.propertyDetails?.associatedPropertyToken} 
         title={property.metadata?.name || 'Unnamed Property'}
-        location={property.metadata?.attributes?.find((attr: any) => attr.trait_type === 'Address')?.value || 'N/A'}
+        location={property.metadata?.attributes?.find((attr: any) => attr.trait_type === 'Address')?.value.toString() || 'N/A'}
         imageUrl={property.metadata?.image || ''}
-        sqft={property.metadata?.attributes?.find((attr: any) => attr.trait_type === 'Square Footage')?.value || 0}
+        sqft={Number(property.metadata?.attributes?.find((attr: any) => attr.trait_type === 'Square Footage')?.value) || 0}
         // featured={property.isFeatured} // Uncomment if backend adds this flag
       />
     ));

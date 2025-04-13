@@ -1,10 +1,11 @@
 import { ethers } from 'ethers';
 import MarketplaceABI from '@/abis/PropertyMarketplace.json';
 import ERC20ABI from '@/abis/ERC20.json';
+import CONTRACT_CONFIG from '@/config/contracts';
 
 // Get the marketplace contract instance
 export const getMarketplaceContract = async (signer?: ethers.Signer) => {
-  const marketplaceAddress = process.env.NEXT_PUBLIC_PROPERTY_MARKETPLACE_ADDRESS;
+  const marketplaceAddress = CONTRACT_CONFIG.PROPERTY_MARKETPLACE_ADDRESS;
   
   if (!marketplaceAddress) {
     throw new Error('Marketplace contract address not configured');
@@ -41,8 +42,8 @@ export const getTokenContract = async (tokenAddress: string, signer?: ethers.Sig
 // Get active listings from the marketplace
 export const getActiveListings = async () => {
   try {
-    // Use the specific localhost endpoint
-    const apiUrl = 'http://localhost:3000';
+    // Use the API_BASE_URL from config
+    const apiUrl = CONTRACT_CONFIG.API_BASE_URL;
     
     console.log(`Fetching marketplace listings from: ${apiUrl}/marketplace/listings`);
     
@@ -81,7 +82,7 @@ export const createListing = async (propertyToken: string, tokenAmount: string, 
     
     // First approve the marketplace to transfer tokens
     const tokenContract = await getTokenContract(propertyToken, signer);
-    const marketplaceAddress = process.env.NEXT_PUBLIC_PROPERTY_MARKETPLACE_ADDRESS;
+    const marketplaceAddress = CONTRACT_CONFIG.PROPERTY_MARKETPLACE_ADDRESS;
     
     const approveTx = await tokenContract.approve(marketplaceAddress, tokenAmount);
     await approveTx.wait();
@@ -292,15 +293,17 @@ export const tryConvertIpfsUrl = (url: string): string => {
   
   // Check if the URL is an IPFS URL (ipfs:// or ipfs/...)
   if (url.startsWith('ipfs://')) {
-    return url.replace('ipfs://', 'https://ipfs.io/ipfs/');
+    const cid = url.replace('ipfs://', '');
+    // Try gateway.pinata.cloud first
+    return `${CONTRACT_CONFIG.IPFS_GATEWAY}${cid}`;
   }
   
   // Handle URLs that have ipfs/ in them
   if (url.includes('ipfs/')) {
     const ipfsPath = url.split('ipfs/')[1];
-    return `https://ipfs.io/ipfs/${ipfsPath}`;
+    return `${CONTRACT_CONFIG.IPFS_GATEWAY}${ipfsPath}`;
   }
   
   // Return the original URL if not an IPFS URL
   return url;
-}; 
+};

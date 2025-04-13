@@ -6,7 +6,8 @@ import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import PropertyCard from '@/components/PropertyCard';
 import { Filter, ArrowDownAZ, Loader2, AlertTriangle } from 'lucide-react';
-import { PropertyDto } from '@/types/dtos'; // Import DTO type
+import { PropertyDto } from '@/types/dtos';
+import { getAllProperties } from '@/services/property';
 
 // Mock data for when the API fails
 const MOCK_PROPERTIES: PropertyDto[] = [
@@ -65,16 +66,8 @@ const PropertiesPage = () => {
       setIsLoading(true);
       setError(null);
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
-        const response = await fetch(`${apiUrl}/properties`, {
-          signal: AbortSignal.timeout(8000) // Timeout after 8 seconds
-        });
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data: PropertyDto[] = await response.json();
+        // Use our service function instead of direct fetch
+        const data = await getAllProperties();
         console.log("API returned properties:", data);
         
         if (data.length === 0) {
@@ -109,11 +102,7 @@ const PropertiesPage = () => {
     };
 
     fetchProperties();
-  }, []); // Empty dependency array means this runs once on mount
-
-  // Basic filtering/sorting state (can be expanded)
-  const [filter, setFilter] = useState({});
-  const [sortBy, setSortBy] = useState('default');
+  }, []);
 
   // Helper function to extract attribute values
   const getAttributeValue = (attributes: any[] | undefined, traitType: string, defaultValue: any) => {
@@ -177,7 +166,8 @@ const PropertiesPage = () => {
             <PropertyCard
               key={uniqueKey}
               id={property.tokenId || 0}
-              nftAddress={property.id} // Use property.id (address) for the link
+              nftAddress={property.id} // Use property.id (NFT address) for the link
+              tokenAddress={property.tokenAddress} // New: Include token address
               title={metadata?.name || 'Unnamed Property'}
               location={address}
               imageUrl={metadata?.image || ''}
