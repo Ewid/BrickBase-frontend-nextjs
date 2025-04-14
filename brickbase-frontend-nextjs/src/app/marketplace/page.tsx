@@ -259,40 +259,44 @@ export default function MarketplacePage() {
 
       // Convert purchaseAmount to token amount with 18 decimals
       const tokenAmount = ethers.parseUnits(purchaseAmount, 18);
-      const tokenAddress = selectedListing.tokenAddress;
+      const listingId = selectedListing.listingId.toString();
 
-      console.log(`Making request to: ${apiUrl}/properties/buy/${tokenAddress}/${tokenAmount}`);
+      console.log(`Purchasing tokens from listing ID: ${listingId}, amount: ${tokenAmount.toString()}`);
       
-      const response = await fetch(`${apiUrl}/properties/buy/${tokenAddress}/${tokenAmount}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          account: account,
-        }),
-      });
+      // Use direct blockchain interaction instead of API call
+      const { buyTokensFromListing } = await import('@/services/marketplace');
+      const result = await buyTokensFromListing(listingId, tokenAmount.toString());
       
-      if (!response.ok) {
-        throw new Error(`Property API returned status ${response.status}`);
+      if (!result.success) {
+        throw new Error(result.error?.message || "Transaction failed");
       }
       
-      const data = await response.json();
-      console.log('Purchase response:', data);
+      console.log('Purchase transaction successful:', result);
 
       toast({
         title: "Tokens purchased successfully!",
-        description: "Your tokens have been added to your wallet.",
+        description: `You've purchased ${purchaseAmount} tokens for ${result.usdcAmount} USDC.`,
       });
       handlePurchaseSuccess();
     } catch (error: any) {
       console.error("Error in handlePurchase:", error);
-      setError(error.message || "Failed to purchase tokens");
-      toast({
-        variant: "destructive",
-        title: "Transaction failed",
-        description: error.message || "There was an error processing your transaction.",
-      });
+      
+      // Enhanced error details for USDC balance issues
+      if (error.message?.includes('do not have enough USDC')) {
+        setError(error.message);
+        toast({
+          variant: "destructive",
+          title: "Insufficient USDC Balance",
+          description: error.message,
+        });
+      } else {
+        setError(error.message || "Failed to purchase tokens");
+        toast({
+          variant: "destructive",
+          title: "Transaction failed",
+          description: error.message || "There was an error processing your transaction.",
+        });
+      }
     } finally {
       setIsPurchasing(false);
     }

@@ -238,15 +238,24 @@ export const buyTokensFromListing = async (listingId: string, amount: string) =>
       const contract = await getMarketplaceContract();
       const listing = await contract.listings(listingId);
       
-      // Calculate total price (amount * pricePerToken)
-      // For USDC: divide by 10^6 not 10^18
-      const totalPrice = (BigInt(amount) * BigInt(listing.pricePerToken)) / BigInt(10**6);
+      // Calculate total price - adjust for decimal difference between tokens (18) and USDC (6)
+      // First convert token amount to a decimal value by dividing by 10^18, then multiply by price
+      const tokenDecimals = 18;
+      const usdcDecimals = 6;
       
-      // Calculate USDC equivalent for user information
-      const usdcAmount = formatCurrency(totalPrice.toString(), 6);
+      // One approach: convert tokens to actual quantity first, then multiply by USDC price
+      const tokenAmountDecimal = Number(ethers.formatUnits(amount, tokenDecimals));
+      const pricePerTokenDecimal = Number(ethers.formatUnits(listing.pricePerToken, usdcDecimals));
+      const totalPriceDecimal = tokenAmountDecimal * pricePerTokenDecimal;
       
-      console.log(`Purchasing tokens: ${amount} tokens at ${formatCurrency(listing.pricePerToken, 6)} USDC per token`);
-      console.log(`Total price: ${usdcAmount} USDC`);
+      // Convert back to USDC wei format (with 6 decimals)
+      const totalPrice = ethers.parseUnits(totalPriceDecimal.toString(), usdcDecimals);
+      
+      // For display only
+      const usdcAmount = totalPriceDecimal.toString();
+      
+      console.log(`Purchasing tokens: ${ethers.formatUnits(amount, tokenDecimals)} tokens at ${pricePerTokenDecimal} USDC per token`);
+      console.log(`Total price calculated: ${totalPriceDecimal} USDC (${totalPrice.toString()} in raw units)`);
       
       // Get signer from the connected wallet
       if (!window.ethereum) {
@@ -263,13 +272,32 @@ export const buyTokensFromListing = async (listingId: string, amount: string) =>
       
       // Check if user has enough USDC for the transaction
       const usdcBalance = await usdcContract.balanceOf(signerAddress);
+      
+      // Add detailed debug logs
+      console.log('--------------------------------');
+      console.log('USDC Purchase Debug Info:');
+      console.log(`User address: ${signerAddress}`);
+      console.log(`USDC Contract address: ${CONTRACT_CONFIG.USDC_TOKEN_ADDRESS}`);
+      console.log(`USDC balance (raw): ${usdcBalance.toString()}`);
+      console.log(`USDC balance (formatted): ${formatCurrency(usdcBalance.toString(), 6)} USDC`);
+      console.log(`Required amount (raw): ${totalPrice.toString()}`);
+      console.log(`Required amount (formatted): ${formatCurrency(totalPrice.toString(), 6)} USDC`);
+      console.log(`Is balance sufficient: ${usdcBalance >= totalPrice}`);
+      console.log('--------------------------------');
+      
       if (usdcBalance < totalPrice) {
         return {
           success: false,
           error: {
             code: 'INSUFFICIENT_FUNDS',
-            message: 'You do not have enough USDC to complete this purchase',
-            usdcAmount
+            message: `You do not have enough USDC to complete this purchase. Required: ${formatCurrency(totalPrice.toString(), 6)} USDC, Available: ${formatCurrency(usdcBalance.toString(), 6)} USDC`,
+            usdcAmount,
+            details: {
+              required: totalPrice.toString(),
+              available: usdcBalance.toString(),
+              requiredFormatted: formatCurrency(totalPrice.toString(), 6),
+              availableFormatted: formatCurrency(usdcBalance.toString(), 6)
+            }
           }
         };
       }
