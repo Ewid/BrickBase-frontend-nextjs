@@ -7,12 +7,26 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardContent, CardFooter, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress'; // Assuming you have a Progress component
 import { Badge } from '@/components/ui/badge';
-import { Loader2, AlertCircle, ThumbsUp, ThumbsDown, ExternalLink, Landmark } from 'lucide-react';
+import { Loader2, AlertCircle, ThumbsUp, ThumbsDown, ExternalLink, Landmark, PlusCircle } from 'lucide-react';
 import { useAccount } from '@/hooks/useAccount';
 import { ethers } from 'ethers';
 import CONTRACT_CONFIG from '@/config/contracts'; // Assuming DAO address is in config
 import PropertyDAOABI from '@/abis/PropertyDAO.json'; // Assuming you have the DAO ABI
 import { toast } from '@/components/ui/use-toast'; // For notifications
+import { PropertyDto } from '@/types/dtos'; // Import PropertyDto
+import { getPropertyByTokenAddress } from '@/services/property'; // Import property service function
+import { tryConvertIpfsUrl } from '@/services/marketplace'; // For image URLs
+import Image from 'next/image'; // For displaying images
+import CreateProposalForm from '@/components/CreateProposalForm'; // Import the new form
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog"; // Assuming shadcn dialog components
+import { getTokenBalance, formatCurrency } from "@/services/marketplace"; // For fallback balance check
 
 // Interface based on the provided API response
 interface Proposal {
@@ -21,6 +35,7 @@ interface Proposal {
     description: string;
     targetContract: string; // Might not be displayed directly but needed for context/execution
     functionCall: string;   // Might not be displayed directly
+    propertyTokenAddress?: string; // Added optional field for associated property
     votesFor: string;       // BigInt as string
     votesAgainst: string;   // BigInt as string
     startTime: number;      // Unix timestamp
@@ -60,36 +75,122 @@ function getStatusVariant(state: string): "default" | "secondary" | "destructive
 export default function DaoPage() {
     const { account, isConnected } = useAccount();
     const [proposals, setProposals] = useState<Proposal[]>([]);
+    const [propertyDetailsCache, setPropertyDetailsCache] = useState<Record<string, PropertyDto | null>>({});
+    const [userOwnedTokens, setUserOwnedTokens] = useState<PropertyDto[]>([]); // State for user's owned tokens
     const [isLoading, setIsLoading] = useState(true);
+    const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+    const [isLoadingUserTokens, setIsLoadingUserTokens] = useState(false); // Loading state for user tokens
     const [error, setError] = useState<string | null>(null);
-    const [votingStates, setVotingStates] = useState<Record<number, boolean>>({}); // Track voting status per proposal
+    const [votingStates, setVotingStates] = useState<Record<number, boolean>>({});
+    const [showCreateProposalModal, setShowCreateProposalModal] = useState(false);
 
-    const fetchProposals = async () => {
+    const fetchProposalsAndDetails = async () => {
         setIsLoading(true);
+        setIsLoadingDetails(true);
         setError(null);
         try {
-            // Use the correct API base URL if it's defined elsewhere, otherwise default
             const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
-            const response = await fetch(`${apiUrl}/dao/proposals`);
-            if (!response.ok) {
-                throw new Error(`Failed to fetch proposals: ${response.statusText}`);
+            // Fetch proposals
+            const proposalsResponse = await fetch(`${apiUrl}/dao/proposals`);
+            if (!proposalsResponse.ok) {
+                throw new Error(`Failed to fetch proposals: ${proposalsResponse.statusText}`);
             }
-            const data: Proposal[] = await response.json();
-            // Sort proposals, maybe newest first? (Optional)
-            // data.sort((a, b) => b.id - a.id); 
-            setProposals(data);
+            const proposalsData: Proposal[] = await proposalsResponse.json();
+            setProposals(proposalsData);
+
+            // Fetch Property Details for proposals
+            const tokenAddresses = Array.from(new Set(proposalsData.map(p => p.propertyTokenAddress).filter(Boolean))) as string[];
+            const detailsPromises = tokenAddresses.map(addr =>
+                getPropertyByTokenAddress(addr).catch(err => {
+                    console.warn(`Failed to fetch details for token ${addr}:`, err);
+                    return null;
+                })
+            );
+            const detailsResults = await Promise.all(detailsPromises);
+            const newDetailsCache: Record<string, PropertyDto | null> = {};
+            tokenAddresses.forEach((addr, index) => {
+                newDetailsCache[addr] = detailsResults[index];
+            });
+            setPropertyDetailsCache(newDetailsCache);
+
         } catch (err: any) {
-            console.error("Error fetching proposals:", err);
+            console.error("Error fetching proposals or details:", err);
             setError(err.message || "Could not load proposals.");
-            setProposals([]); // Clear proposals on error
+            setProposals([]);
+            setPropertyDetailsCache({});
         } finally {
             setIsLoading(false);
+            setIsLoadingDetails(false);
+        }
+    };
+
+    // Fetch user's owned property tokens (similar to MarketplacePage)
+    const fetchUserOwnedTokens = async () => {
+        if (!account) return;
+        setIsLoadingUserTokens(true);
+        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+        try {
+            // Prefer the dedicated endpoint
+            console.log(`DAO Page: Fetching properties owned by ${account}...`);
+            const response = await fetch(`${apiUrl}/properties/owned/${account}`, {
+                signal: AbortSignal.timeout(30000),
+                next: { revalidate: 300 } // Revalidate cache every 5 minutes
+            });
+            if (!response.ok) {
+                throw new Error(`Failed to fetch user properties: ${response.status} ${response.statusText}`);
+            }
+            const data: PropertyDto[] = await response.json();
+            console.log('DAO Page: Properties owned by user:', data);
+            setUserOwnedTokens(data);
+        } catch (apiError) {
+            console.warn('DAO Page: API endpoint /properties/owned failed, falling back to manual balance check:', apiError);
+            // Fallback logic (might be less efficient)
+            try {
+                 const allPropertiesResponse = await fetch(`${apiUrl}/properties`, {
+                    signal: AbortSignal.timeout(30000),
+                    next: { revalidate: 300 }
+                });
+                if (!allPropertiesResponse.ok) {
+                    throw new Error(`Fallback failed: Could not fetch all properties: ${allPropertiesResponse.statusText}`);
+                }
+                const allProperties: PropertyDto[] = await allPropertiesResponse.json();
+                
+                const ownedChecks = allProperties.map(async (property) => {
+                    const tokenAddress = property.tokenAddress || property.propertyDetails?.associatedPropertyToken;
+                    if (!tokenAddress) return null;
+                    try {
+                        const balance = await getTokenBalance(tokenAddress, account);
+                        if (ethers.getBigInt(balance) > 0) {
+                            return property; // Keep the original PropertyDto structure
+                        }
+                        return null;
+                    } catch (balanceError) {
+                        console.error(`Error checking balance for ${tokenAddress}:`, balanceError);
+                        return null;
+                    }
+                });
+
+                const ownedResults = await Promise.all(ownedChecks);
+                const filteredOwned = ownedResults.filter((p): p is PropertyDto => p !== null);
+                console.log('DAO Page: Properties owned by user (fallback method):', filteredOwned);
+                setUserOwnedTokens(filteredOwned);
+            } catch (fallbackError: any) {
+                 console.error('DAO Page: Error fetching user properties (including fallback):', fallbackError);
+                 setError(fallbackError.message || "Could not load your properties.");
+                 setUserOwnedTokens([]);
+            }
+        }
+        finally {
+            setIsLoadingUserTokens(false);
         }
     };
 
     useEffect(() => {
-        fetchProposals();
-    }, []);
+        fetchProposalsAndDetails(); // Fetch proposals and their details
+        if (isConnected && account) {
+            fetchUserOwnedTokens(); // Fetch user tokens when connected
+        }
+    }, [account, isConnected]); // Add dependencies
 
     // --- Smart Contract Interactions (Stubs) ---
 
@@ -121,7 +222,7 @@ export default function DaoPage() {
             await tx.wait(); // Wait for transaction confirmation
 
             toast({ title: "Vote Cast Successfully!", description: `Your vote on proposal #${proposalId} has been recorded.` });
-            fetchProposals(); // Refresh proposals after voting
+            fetchProposalsAndDetails(); // Use the renamed function
 
         } catch (err: any) {
             console.error("Voting failed:", err);
@@ -148,9 +249,18 @@ export default function DaoPage() {
         toast({ title: "Claim Rent (Not Implemented)", description: "Rent claiming functionality needs implementation.", variant: "default" });
     };
 
+    // Placeholder - Needs implementation (modal or new page)
+    const handleCreateProposalClick = () => {
+        if (!isConnected || !account) {
+            toast({ title: "Connect Wallet", description: "Please connect your wallet to create a proposal.", variant: "destructive" });
+            return;
+        }
+        setShowCreateProposalModal(true); // Open the modal
+    };
+
     // --- Render Logic ---
 
-    const renderProposalCard = (proposal: Proposal) => {
+    const renderProposalCard = ({ proposal }: { proposal: Proposal }) => {
         const votesFor = ethers.getBigInt(proposal.votesFor);
         const votesAgainst = ethers.getBigInt(proposal.votesAgainst);
         const totalVotes = votesFor + votesAgainst;
@@ -165,11 +275,44 @@ export default function DaoPage() {
         const formattedVotesFor = parseFloat(ethers.formatUnits(votesFor, 18)).toLocaleString(undefined, { maximumFractionDigits: 2 });
         const formattedVotesAgainst = parseFloat(ethers.formatUnits(votesAgainst, 18)).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
+        // Get property details from cache
+        const propertyDetails = proposal.propertyTokenAddress ? propertyDetailsCache[proposal.propertyTokenAddress] : null;
+        const propertyImageUrl = propertyDetails?.metadata?.image ? tryConvertIpfsUrl(propertyDetails.metadata.image) : null;
+        const propertyName = propertyDetails?.metadata?.name;
+
         return (
-            <Card key={proposal.id} className="glass-card overflow-hidden flex flex-col">
+            <Card key={proposal.id} className="glass-card bg-gray-900/70 border border-white/10 overflow-hidden flex flex-col">
                 <CardHeader>
+                    {/* Display Property Image and Name if available */} 
+                    {proposal.propertyTokenAddress && (
+                        <div className="mb-3 p-3 bg-gray-800/40 rounded-lg border border-gray-700/50 flex items-center gap-3">
+                            {isLoadingDetails ? (
+                                <div className="w-12 h-12 rounded-md bg-gray-700 animate-pulse"></div>
+                            ) : propertyImageUrl ? (
+                                <div className="relative w-12 h-12 rounded-md overflow-hidden flex-shrink-0">
+                                    <Image 
+                                        src={propertyImageUrl} 
+                                        alt={propertyName || 'Property Image'} 
+                                        fill 
+                                        className="object-cover"
+                                        sizes="48px"
+                                    />
+                                </div>
+                            ) : (
+                                <div className="w-12 h-12 rounded-md bg-gray-700 flex items-center justify-center text-gray-400 text-xs">
+                                    No Img
+                                </div>
+                            )}
+                            <div>
+                                <p className="text-xs text-gray-400 mb-0.5">Related Property:</p>
+                                <p className="text-sm font-semibold text-white line-clamp-1" title={propertyName || 'Loading...'}>
+                                    {isLoadingDetails ? 'Loading...' : (propertyName || 'Details unavailable')}
+                                </p>
+                            </div>
+                        </div>
+                    )}
                     <div className="flex justify-between items-start gap-2">
-                        <CardTitle className="text-lg line-clamp-2">Proposal #{proposal.id}: {proposal.description}</CardTitle>
+                        <CardTitle className="text-lg line-clamp-2 text-white">Proposal #{proposal.id}: {proposal.description}</CardTitle>
                         <Badge variant={getStatusVariant(proposal.state)}>{proposal.state}</Badge>
                     </div>
                     <CardDescription className="text-xs text-gray-400 pt-1">
@@ -201,17 +344,9 @@ export default function DaoPage() {
                            <span className='text-green-400'>For: {formattedVotesFor}</span>
                            <span className='text-red-400'>Against: {formattedVotesAgainst}</span>
                         </div>
-                        {/* Basic Progress Bar */}
+                        {/* Basic Progress Bar - Styles updated in progress.tsx */}
                         <div className="w-full bg-gray-700 rounded-full h-2.5 overflow-hidden">
-                            <div 
-                                className="bg-gradient-to-r from-green-500 to-emerald-400 h-2.5 rounded-l-full" 
-                                style={{ width: `${forPercentage}%` }}
-                            ></div>
-                             {/* Optional: Show against bar if needed, adjust styling carefully */}
-                             {/* <div 
-                                className="bg-gradient-to-r from-red-500 to-rose-400 h-2.5" 
-                                style={{ width: `${againstPercentage}%`, marginLeft: `${forPercentage}%` }} 
-                            ></div> */}
+                            <Progress value={forPercentage} className="h-2.5" />
                         </div>
                     </div>
                 </CardContent>
@@ -258,14 +393,24 @@ export default function DaoPage() {
                         <h1 className="text-3xl font-bold mb-2">DAO <span className="text-gradient">Governance</span></h1>
                         <p className="text-gray-400">Review and vote on proposals for the Property DAO.</p>
                     </div>
-                     {/* Placeholder Claim Rent Button */}
-                     <Button 
-                        onClick={handleClaimRent} 
-                        className="crypto-btn"
-                    >
-                         <Landmark className="h-4 w-4 mr-2" /> 
-                         Claim Rent (Placeholder)
-                    </Button>
+                    <div className="flex flex-col sm:flex-row gap-4">
+                        {/* Claim Rent Button */}
+                        <Button 
+                            onClick={handleClaimRent} 
+                            className="crypto-btn"
+                        >
+                            <Landmark className="h-4 w-4 mr-2" /> 
+                            Claim Rent (Placeholder)
+                        </Button>
+                        {/* Create Proposal Button */}
+                        <Button 
+                            onClick={handleCreateProposalClick} 
+                            className="crypto-btn"
+                        >
+                            <PlusCircle className="h-4 w-4 mr-2" />
+                            Create Proposal
+                        </Button>
+                    </div>
                 </div>
 
                 {isLoading ? (
@@ -277,7 +422,7 @@ export default function DaoPage() {
                         <AlertCircle className="h-10 w-10 mx-auto mb-4" />
                         <h3 className="text-xl font-semibold mb-2">Failed to Load Proposals</h3>
                         <p>{error}</p>
-                        <Button onClick={fetchProposals} variant="outline" className="mt-6">
+                        <Button onClick={fetchProposalsAndDetails} variant="outline" className="mt-6">
                             Retry
                         </Button>
                     </div>
@@ -287,11 +432,33 @@ export default function DaoPage() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {proposals.map(renderProposalCard)}
+                        {proposals.map(proposal => renderProposalCard({ proposal }))}
                     </div>
                 )}
             </main>
             <Footer />
+
+            {/* Create Proposal Modal */} 
+            <Dialog open={showCreateProposalModal} onOpenChange={setShowCreateProposalModal}>
+                <DialogContent className="glass-card border-gray-700 sm:max-w-[525px]">
+                    <DialogHeader>
+                        <DialogTitle>Create New Proposal</DialogTitle>
+                        <DialogDescription>
+                            Fill in the details below to submit a new governance proposal.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <CreateProposalForm 
+                            onSuccess={() => {
+                                setShowCreateProposalModal(false); // Close modal on success
+                                fetchProposalsAndDetails(); // Use the renamed function
+                            }} 
+                            onClose={() => setShowCreateProposalModal(false)}
+                            ownedTokens={userOwnedTokens} // Pass owned tokens to the form
+                        />
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 } 
