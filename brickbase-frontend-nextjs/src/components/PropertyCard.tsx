@@ -123,8 +123,8 @@ const PropertyCard = ({
       </div>
 
       <CardHeader className="pb-2">
-        <div className="flex justify-between items-start">
-          <h3 className="font-bold text-lg truncate" title={title}>{title}</h3>
+        <div className="flex justify-between items-start gap-2">
+          <h3 className="font-bold text-lg truncate flex-1 min-w-0" title={title}>{title}</h3>
           <div className="flex items-center gap-1 text-xs bg-crypto-dark/50 px-2 py-1 rounded-full flex-shrink-0">
             <Building2 className="h-3 w-3 text-crypto-light" />
             <span>{sqft} sqft</span>

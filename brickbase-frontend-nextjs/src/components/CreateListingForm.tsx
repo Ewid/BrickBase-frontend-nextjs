@@ -329,7 +329,7 @@ const CreateListingForm = ({
         {step === 'approve' ? (
           <Button 
             type="submit" 
-            className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white"
+            className="w-full crypto-btn"
             disabled={isApproving || isApproved || isLoadingBalance || balance === '0' || !validateAmount(amount) || !amount}
           >
             {isApproving ? (
@@ -351,7 +351,7 @@ const CreateListingForm = ({
         ) : (
           <Button 
             type="submit" 
-            className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white"
+            className="w-full crypto-btn"
             disabled={isSubmitting || success || !priceUsdc}
           >
             {isSubmitting ? (

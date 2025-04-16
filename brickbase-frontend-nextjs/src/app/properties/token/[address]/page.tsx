@@ -240,7 +240,7 @@ const TokenPropertyDetailPage = () => {
       <Navbar />
       <main className="pt-24 pb-10 px-6 max-w-5xl mx-auto">
         <div className="mb-6">
-          <Link href="/properties" className="inline-flex items-center text-crypto-light hover:text-white transition-colors">
+          <Link href="/properties" className="inline-flex items-center text-gray-300 hover:text-white transition-colors">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Properties
           </Link>
@@ -271,7 +271,7 @@ const TokenPropertyDetailPage = () => {
           
           <div className="p-6 md:p-8">
             <div className="flex flex-col md:flex-row justify-between md:items-center mb-4">
-              <h1 className="text-3xl font-bold mb-2 md:mb-0" title={displayTitle}>{displayTitle}</h1>
+              <h1 className="text-3xl font-bold mb-2 md:mb-0 text-white" title={displayTitle}>{displayTitle}</h1>
               <div className="flex items-center text-gray-400 text-sm">
                 <MapPin className="h-4 w-4 mr-1" />
                 {address}
@@ -281,32 +281,32 @@ const TokenPropertyDetailPage = () => {
             <div className="flex flex-wrap gap-4 mb-6 border-b border-white/10 pb-6">
                <div className="flex items-center gap-1 text-sm bg-crypto-dark/50 px-3 py-1 rounded-full">
                   <Building2 className="h-4 w-4 text-crypto-light" />
-                  <span>{sqft} sqft</span>
+                  <span className="text-gray-200">{sqft} sqft</span>
                 </div>
                 <div className="flex items-center gap-1 text-sm bg-crypto-dark/50 px-3 py-1 rounded-full">
                   <Tag className="h-4 w-4 text-crypto-light" />
-                  <span>{bedrooms} Beds</span>
+                  <span className="text-gray-200">{bedrooms} Beds</span>
                 </div>
                  <div className="flex items-center gap-1 text-sm bg-crypto-dark/50 px-3 py-1 rounded-full">
                   <Tag className="h-4 w-4 text-crypto-light" />
-                  <span>{bathrooms} Baths</span>
+                  <span className="text-gray-200">{bathrooms} Baths</span>
                 </div>
                  <div className="flex items-center gap-1 text-sm bg-crypto-dark/50 px-3 py-1 rounded-full">
                   <Tag className="h-4 w-4 text-crypto-light" />
-                  <span>Built: {yearBuilt}</span>
+                  <span className="text-gray-200">Built: {yearBuilt}</span>
                 </div>
                 <div className="flex items-center gap-1 text-sm bg-crypto-dark/50 px-3 py-1 rounded-full">
                   <Tag className="h-4 w-4 text-crypto-light" />
-                  <span>Type: {propertyType}</span>
+                  <span className="text-gray-200">Type: {propertyType}</span>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-6">
               <div className="md:col-span-2">
-                <h2 className="text-xl font-semibold mb-3">Description</h2>
+                <h2 className="text-xl font-semibold mb-3 text-white">Description</h2>
                 <p className="text-gray-300 leading-relaxed">{displayDescription}</p>
                 
-                <h3 className="text-lg font-semibold mt-6 mb-2">Contract Details</h3>
+                <h3 className="text-lg font-semibold mt-6 mb-2 text-white">Contract Details</h3>
                 <div className="text-xs text-gray-400 space-y-1 break-all">
                     <p>NFT Address: {property.id || 'N/A'}</p>
                     <p>Token Address: {tokenAddress || 'Not available'}</p>
@@ -320,8 +320,10 @@ const TokenPropertyDetailPage = () => {
                 <div className="bg-gray-800/50 p-4 rounded-lg text-center">
                   <p className="text-gray-400 text-sm">Purchase options available on the Marketplace.</p>
                   <div className="mt-4 flex flex-col gap-2">
-                    <Link href="/marketplace" className="inline-block">
-                        <Button variant="outline" className="w-full border-crypto-light/30 text-crypto-light hover:bg-crypto-light/10">
+                    <Link href="/marketplace" className="inline-block w-full">
+                        <Button 
+                          className="w-full crypto-btn"
+                        >
                             <ShoppingCart className="mr-2 h-4 w-4" />
                             Go to Marketplace
                         </Button>
