@@ -624,7 +624,7 @@ export default function MarketplacePage() {
                   </Button>
                 </Link>
                 <Button 
-                  className="flex-1"
+                  className="flex-1 crypto-btn"
                   size="sm"
                   onClick={() => handleListingSelect(listing)}
                 >
@@ -922,7 +922,7 @@ export default function MarketplacePage() {
             
             <Button 
               onClick={handleCreateListingClick}
-              className="h-10 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white"
+              className="h-10 crypto-btn"
             >
               <Tag className="h-4 w-4 mr-2" />
               Create Listing
