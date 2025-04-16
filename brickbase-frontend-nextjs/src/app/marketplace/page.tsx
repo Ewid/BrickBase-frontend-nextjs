@@ -618,7 +618,10 @@ export default function MarketplacePage() {
               </CardContent>
               <CardFooter className="p-4 pt-0 flex gap-2">
                 <Link href={`/properties/token/${listing.tokenAddress || 'unknown'}`} className="flex-1">
-                  <Button variant="outline" className="w-full text-xs" size="sm">
+                  <Button 
+                    className="w-full crypto-btn"
+                    size="sm"
+                  >
                     View Property
                     <ArrowUpRight className="h-3 w-3 ml-1.5" />
                   </Button>
