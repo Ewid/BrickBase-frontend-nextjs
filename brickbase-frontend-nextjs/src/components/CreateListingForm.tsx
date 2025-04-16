@@ -233,7 +233,7 @@ const CreateListingForm = ({
       {/* Approval Step */}
       <form onSubmit={step === 'approve' ? handleApproveTokens : handleCreateListing} className="space-y-4">
         <div>
-          <Label htmlFor="amount">Amount of tokens to sell</Label>
+          <Label htmlFor="amount" className="text-gray-300">Amount of tokens to sell</Label>
           <div className="flex items-center mt-1.5">
             <Input
               id="amount"
@@ -241,13 +241,13 @@ const CreateListingForm = ({
               value={amount}
               onChange={handleAmountChange}
               placeholder="Enter amount..."
-              className="flex-1"
+              className="flex-1 text-white placeholder:text-gray-500"
               disabled={isSubmitting || isLoadingBalance || isApproved || step === 'listing'}
             />
             <Button 
               type="button" 
               variant="outline" 
-              className="ml-2"
+              className="ml-2 text-gray-300 hover:text-white"
               onClick={handleSetMax}
               disabled={isSubmitting || isLoadingBalance || balance === '0' || isApproved || step === 'listing'}
             >
@@ -267,8 +267,8 @@ const CreateListingForm = ({
         </div>
         
         <div>
-          <Label htmlFor="price" className="flex items-center">
-            <DollarSign className="h-3.5 w-3.5 mr-1" />
+          <Label htmlFor="price" className="flex items-center text-gray-300">
+            <DollarSign className="h-3.5 w-3.5 mr-1 text-gray-400" />
             Price per token (USDC)
           </Label>
           <Input
@@ -282,6 +282,7 @@ const CreateListingForm = ({
               }
             }}
             placeholder="10.00"
+            className="text-white placeholder:text-gray-500"
             disabled={isSubmitting || step === 'approve' && !isApproved}
           />
           <div className="flex justify-between text-xs text-gray-400 mt-1">
@@ -293,7 +294,7 @@ const CreateListingForm = ({
         {amount && Number(amount) > 0 && priceUsdc && Number(priceUsdc) > 0 && (
           <div className="mt-3 p-3 bg-blue-900/20 rounded-lg border border-blue-900/30">
             <div className="flex justify-between items-center">
-              <span className="text-sm">Total listing value:</span>
+              <span className="text-sm text-gray-300">Total listing value:</span>
               <div className="flex items-center">
                 <DollarSign className="h-3.5 w-3.5 mr-0.5 text-green-400" />
                 <span className="font-medium text-green-400">${calculateTotalValueUsdc()} USDC</span>
@@ -306,14 +307,14 @@ const CreateListingForm = ({
         {approvalError && step === 'approve' && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{approvalError}</AlertDescription>
+            <AlertDescription className="text-red-300">{approvalError}</AlertDescription>
           </Alert>
         )}
         
         {error && step === 'listing' && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription className="text-red-300">{error}</AlertDescription>
           </Alert>
         )}
         

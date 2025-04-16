@@ -170,8 +170,8 @@ const BuyTokensForm = ({ listing, onSuccess, onError }: BuyTokensFormProps) => {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <div className="flex justify-between items-center">
-          <Label htmlFor="amount" className="flex items-center">
+        <div className="flex justify-between items-center mb-1">
+          <Label htmlFor="amount" className="flex items-center text-gray-300">
             Amount of tokens to buy
             <TooltipProvider>
               <Tooltip>
@@ -179,7 +179,7 @@ const BuyTokensForm = ({ listing, onSuccess, onError }: BuyTokensFormProps) => {
                   <Info className="h-4 w-4 ml-1 text-gray-400 cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p className="max-w-xs text-sm">
+                  <p className="max-w-xs text-sm text-gray-200">
                     Enter the amount of tokens you want to buy. For example, enter 0.5 for half a token.
                   </p>
                 </TooltipContent>
@@ -196,7 +196,7 @@ const BuyTokensForm = ({ listing, onSuccess, onError }: BuyTokensFormProps) => {
               value={userFriendlyAmount}
               onChange={handleInputChange}
               placeholder="0.00"
-              className={`flex-1 pr-16 ${!inputValid && userFriendlyAmount ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+              className={`flex-1 pr-16 text-white placeholder:text-gray-500 bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 ${!inputValid && userFriendlyAmount ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
               disabled={isSubmitting}
             />
             <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
@@ -228,7 +228,7 @@ const BuyTokensForm = ({ listing, onSuccess, onError }: BuyTokensFormProps) => {
             size="sm"
             onClick={() => handleSetPercentage(25)}
             disabled={isSubmitting}
-            className="text-xs py-1"
+            className="text-xs py-1 text-gray-300 hover:text-white"
           >
             25%
           </Button>
@@ -238,7 +238,7 @@ const BuyTokensForm = ({ listing, onSuccess, onError }: BuyTokensFormProps) => {
             size="sm"
             onClick={() => handleSetPercentage(50)}
             disabled={isSubmitting}
-            className="text-xs py-1"
+            className="text-xs py-1 text-gray-300 hover:text-white"
           >
             50%
           </Button>
@@ -248,7 +248,7 @@ const BuyTokensForm = ({ listing, onSuccess, onError }: BuyTokensFormProps) => {
             size="sm"
             onClick={() => handleSetPercentage(75)}
             disabled={isSubmitting}
-            className="text-xs py-1"
+            className="text-xs py-1 text-gray-300 hover:text-white"
           >
             75%
           </Button>
@@ -258,7 +258,7 @@ const BuyTokensForm = ({ listing, onSuccess, onError }: BuyTokensFormProps) => {
             size="sm"
             onClick={() => handleSetPercentage(100)}
             disabled={isSubmitting}
-            className="text-xs py-1"
+            className="text-xs py-1 text-gray-300 hover:text-white"
           >
             100%
           </Button>
@@ -304,15 +304,15 @@ const BuyTokensForm = ({ listing, onSuccess, onError }: BuyTokensFormProps) => {
       {estimatedGasError && (
         <Alert variant="destructive" className="bg-red-900/20 border-red-900/30">
           <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{estimatedGasError}</AlertDescription>
-          <p className="text-xs mt-1">This usually means the transaction would fail if submitted. Please try a different amount or check your USDC balance.</p>
+          <AlertDescription className="text-red-300">{estimatedGasError}</AlertDescription>
+          <p className="text-xs mt-1 text-red-400">This usually means the transaction would fail if submitted. Please try a different amount or check your USDC balance.</p>
         </Alert>
       )}
       
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription className="text-red-300">{error}</AlertDescription>
         </Alert>
       )}
       

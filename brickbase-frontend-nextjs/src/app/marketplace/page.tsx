@@ -574,25 +574,25 @@ export default function MarketplacePage() {
                     {sqft > 0 && (
                       <div className="flex items-center gap-1 text-xs bg-gray-800/80 px-2 py-1 rounded-full">
                         <Building2 className="h-3 w-3 text-gray-400" />
-                        <span>{sqft} sqft</span>
+                        <span className="text-gray-300">{sqft} sqft</span>
                       </div>
                     )}
                     {bedrooms > 0 && (
                       <div className="flex items-center gap-1 text-xs bg-gray-800/80 px-2 py-1 rounded-full">
                         <Tag className="h-3 w-3 text-gray-400" />
-                        <span>{bedrooms} Beds</span>
+                        <span className="text-gray-300">{bedrooms} Beds</span>
                       </div>
                     )}
                     {bathrooms > 0 && (
                       <div className="flex items-center gap-1 text-xs bg-gray-800/80 px-2 py-1 rounded-full">
                         <Tag className="h-3 w-3 text-gray-400" />
-                        <span>{bathrooms} Baths</span>
+                        <span className="text-gray-300">{bathrooms} Baths</span>
                       </div>
                     )}
                     {propertyType && (
                       <div className="flex items-center gap-1 text-xs bg-gray-800/80 px-2 py-1 rounded-full">
                         <Tag className="h-3 w-3 text-gray-400" />
-                        <span>{propertyType}</span>
+                        <span className="text-gray-300">{propertyType}</span>
                       </div>
                     )}
                   </div>
@@ -698,28 +698,28 @@ export default function MarketplacePage() {
                                       {getAttributeValue(selectedListing.propertyDetails.metadata.attributes, 'Square Footage') && (
                                         <div className="flex items-center gap-1 text-xs">
                                           <Building2 className="h-3 w-3 text-gray-500" />
-                                          <span>{getAttributeValue(selectedListing.propertyDetails.metadata.attributes, 'Square Footage', '0')} sqft</span>
+                                          <span className="text-gray-300">{getAttributeValue(selectedListing.propertyDetails.metadata.attributes, 'Square Footage', '0')} sqft</span>
                                         </div>
                                       )}
                                       
                                       {getAttributeValue(selectedListing.propertyDetails.metadata.attributes, 'Bedrooms') && (
                                         <div className="flex items-center gap-1 text-xs">
                                           <Tag className="h-3 w-3 text-gray-500" />
-                                          <span>{getAttributeValue(selectedListing.propertyDetails.metadata.attributes, 'Bedrooms', '0')} Beds</span>
+                                          <span className="text-gray-300">{getAttributeValue(selectedListing.propertyDetails.metadata.attributes, 'Bedrooms', '0')} Beds</span>
                                         </div>
                                       )}
                                       
                                       {getAttributeValue(selectedListing.propertyDetails.metadata.attributes, 'Bathrooms') && (
                                         <div className="flex items-center gap-1 text-xs">
                                           <Tag className="h-3 w-3 text-gray-500" />
-                                          <span>{getAttributeValue(selectedListing.propertyDetails.metadata.attributes, 'Bathrooms', '0')} Baths</span>
+                                          <span className="text-gray-300">{getAttributeValue(selectedListing.propertyDetails.metadata.attributes, 'Bathrooms', '0')} Baths</span>
                                         </div>
                                       )}
                                       
                                       {getAttributeValue(selectedListing.propertyDetails.metadata.attributes, 'Property Type') && (
                                         <div className="flex items-center gap-1 text-xs">
                                           <Tag className="h-3 w-3 text-gray-500" />
-                                          <span>{getAttributeValue(selectedListing.propertyDetails.metadata.attributes, 'Property Type', 'Not specified')}</span>
+                                          <span className="text-gray-300">{getAttributeValue(selectedListing.propertyDetails.metadata.attributes, 'Property Type', 'Not specified')}</span>
                                         </div>
                                       )}
                                     </div>
@@ -749,7 +749,7 @@ export default function MarketplacePage() {
                               </div>
                               <div className="flex justify-between items-center">
                                 <span className="text-sm font-medium text-gray-300">Available:</span>
-                                <span className="font-semibold flex items-center gap-1">
+                                <span className="font-semibold flex items-center gap-1 text-white">
                                   <span>{selectedListing.formattedAmount}</span>
                                   <span className="text-xs text-gray-400">tokens</span>
                                 </span>
@@ -772,7 +772,7 @@ export default function MarketplacePage() {
                                       max={selectedListing.formattedAmount}
                                       value={purchaseAmount}
                                       onChange={(e) => setPurchaseAmount(e.target.value)}
-                                      className="pl-9 pr-16 bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                      className="pl-9 pr-16 bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-white placeholder:text-gray-500"
                                     />
                                     <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">
                                       tokens
@@ -834,10 +834,10 @@ export default function MarketplacePage() {
                               </h4>
                               <div className="grid grid-cols-2 gap-3 text-sm">
                                 <span className="text-gray-300">Tokens to buy:</span>
-                                <span className="text-right font-medium">{purchaseAmount}</span>
+                                <span className="text-right font-medium text-white">{purchaseAmount}</span>
                                 
                                 <span className="text-gray-300">Price per token:</span>
-                                <span className="text-right font-medium">${selectedListing.formattedPrice} USDC</span>
+                                <span className="text-right font-medium text-white">${selectedListing.formattedPrice} USDC</span>
                                 
                                 <span className="text-gray-300 font-medium pt-2 border-t border-blue-800/30">Total cost:</span>
                                 <span className="text-right font-bold text-green-400 pt-2 border-t border-blue-800/30 flex items-center justify-end">
@@ -972,7 +972,7 @@ export default function MarketplacePage() {
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  className="h-8 px-2"
+                  className="h-8 px-2 text-gray-300 hover:text-white"
                   onClick={() => setSelectedProperty(null)}
                 >
                   ← Back to properties
@@ -995,7 +995,7 @@ export default function MarketplacePage() {
                     )}
                   </div>
                   <div>
-                    <h3 className="text-lg font-medium">{selectedProperty.metadata?.name || 'Property Listing'}</h3>
+                    <h3 className="text-lg font-medium text-gray-100">{selectedProperty.metadata?.name || 'Property Listing'}</h3>
                     <div className="flex justify-between items-center text-xs text-gray-400">
                       <span>Token ID: {formatTokenId(selectedProperty.tokenId)}</span>
                     </div>
@@ -1016,7 +1016,7 @@ export default function MarketplacePage() {
                     1
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-medium">Approve Token Transfer</p>
+                    <p className="text-sm font-medium text-gray-200">Approve Token Transfer</p>
                     <p className="text-xs text-gray-400">Allow the marketplace to transfer your tokens</p>
                   </div>
                   <div className="w-6 h-6">
@@ -1034,7 +1034,7 @@ export default function MarketplacePage() {
                     2
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-medium">Create Listing</p>
+                    <p className="text-sm font-medium text-gray-200">Create Listing</p>
                     <p className="text-xs text-gray-400">Publish your listing to the marketplace</p>
                   </div>
                   <div className="w-6 h-6">
@@ -1076,7 +1076,7 @@ export default function MarketplacePage() {
             </div>
           ) : (
             <div className="space-y-6">
-              <h3 className="text-lg font-medium">Select a Property to List</h3>
+              <h3 className="text-lg font-medium text-gray-100">Select a Property to List</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-1">
                 {userProperties.map((property, index) => (
                   <div 
@@ -1101,7 +1101,7 @@ export default function MarketplacePage() {
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-medium truncate">{property.metadata?.name || 'Unnamed Property'}</h4>
+                        <h4 className="font-medium truncate text-gray-100">{property.metadata?.name || 'Unnamed Property'}</h4>
                         <div className="flex justify-between items-center text-xs text-gray-400">
                           <span>Token ID: {formatTokenId(property.tokenId)}</span>
                           <span className="bg-green-900/30 text-green-400 px-2 py-0.5 rounded-full text-xs">
