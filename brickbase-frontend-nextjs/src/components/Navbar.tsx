@@ -22,6 +22,7 @@ const Navbar = () => {
           <Link href="/" className="text-white hover:text-crypto-light transition-colors">Home</Link>
           <Link href="/properties" className="text-white hover:text-crypto-light transition-colors">Properties</Link>
           <Link href="/marketplace" className="text-white hover:text-crypto-light transition-colors">Marketplace</Link>
+          <Link href="/dao" className="text-white hover:text-crypto-light transition-colors">Governance</Link>
           <Link href="/about" className="text-white hover:text-crypto-light transition-colors">About</Link>
         </div>
 
@@ -58,6 +59,10 @@ const Navbar = () => {
             <Link href="/marketplace" className="flex items-center space-x-2 text-white hover:text-crypto-light transition-colors p-2" onClick={() => setIsOpen(false)}>
               <ChartBar className="h-5 w-5" />
               <span>Marketplace</span>
+            </Link>
+            <Link href="/dao" className="flex items-center space-x-2 text-white hover:text-crypto-light transition-colors p-2" onClick={() => setIsOpen(false)}>
+              <Wallet className="h-5 w-5" />
+              <span>Governance</span>
             </Link>
             <Link href="/about" className="flex items-center space-x-2 text-white hover:text-crypto-light transition-colors p-2" onClick={() => setIsOpen(false)}>
               <User className="h-5 w-5" />
