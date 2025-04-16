@@ -248,11 +248,14 @@ export const buyTokensFromListing = async (listingId: string, amount: string) =>
       const pricePerTokenDecimal = Number(ethers.formatUnits(listing.pricePerToken, usdcDecimals));
       const totalPriceDecimal = tokenAmountDecimal * pricePerTokenDecimal;
       
-      // Convert back to USDC wei format (with 6 decimals)
-      const totalPrice = ethers.parseUnits(totalPriceDecimal.toString(), usdcDecimals);
+      // Round the calculated price to 6 decimals before parsing
+      const roundedTotalPriceString = totalPriceDecimal.toFixed(usdcDecimals);
       
-      // For display only
-      const usdcAmount = totalPriceDecimal.toString();
+      // Convert rounded price back to USDC wei format (with 6 decimals)
+      const totalPrice = ethers.parseUnits(roundedTotalPriceString, usdcDecimals);
+      
+      // For display only (use the rounded value)
+      const usdcAmount = roundedTotalPriceString;
       
       console.log(`Purchasing tokens: ${ethers.formatUnits(amount, tokenDecimals)} tokens at ${pricePerTokenDecimal} USDC per token`);
       console.log(`Total price calculated: ${totalPriceDecimal} USDC (${totalPrice.toString()} in raw units)`);
