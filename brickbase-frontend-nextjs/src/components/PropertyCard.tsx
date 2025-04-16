@@ -98,6 +98,7 @@ const PropertyCard = ({
 
   return (
     <Card className={`overflow-hidden card-hover glass-card border-0 ${featured ? 'border-l-4 border-l-crypto-teal' : ''}`}>
+      {/* Image Section */}
       <div className="relative">
         <div className="aspect-[4/3] overflow-hidden relative">
           {imgSrc ? (
@@ -108,8 +109,8 @@ const PropertyCard = ({
               fill
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
               onError={handleImageError}
-              loading="lazy" // Add lazy loading 
-              priority={featured} // Prioritize loading of featured properties
+              loading="lazy"
+              priority={featured}
             />
           ) : (
             <div className="w-full h-full bg-gray-700/50 flex items-center justify-center text-gray-400">No Image</div>
@@ -122,27 +123,29 @@ const PropertyCard = ({
         )}
       </div>
 
-      <CardHeader className="pb-2">
-        <div className="flex justify-between items-start gap-2">
-          <h3 className="font-bold text-lg truncate flex-1 min-w-0" title={title}>{title}</h3>
-          <div className="flex items-center gap-1 text-xs bg-crypto-dark/50 px-2 py-1 rounded-full flex-shrink-0">
-            <Building2 className="h-3 w-3 text-crypto-light" />
-            <span>{sqft} sqft</span>
+      {/* Content Section - Mimicking Marketplace Card Structure */}
+      <CardContent className="p-4 flex-grow flex flex-col justify-between">
+        <div className="flex flex-col gap-2 mb-auto">
+          {/* Title */}
+          <h3 className="font-bold text-lg line-clamp-1" title={title}>
+            {title}
+          </h3>
+          
+          {/* Location */}
+          <div className="flex items-center text-gray-400 text-sm">
+            <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
+            <span className="line-clamp-1" title={location}>{location}</span>
           </div>
-        </div>
-        <div className="flex items-center text-gray-400 text-sm">
-          <MapPin className="h-3 w-3 mr-1" />
-          <span className="truncate" title={location}>{location}</span>
-        </div>
-      </CardHeader>
-
-      <CardContent className="pb-3 min-h-[60px]"> 
-        <div className="flex justify-between items-center">
-          {renderPriceSection()}
+          
+          {/* Price Section (if applicable) */}
+          <div className="mt-2">
+            {renderPriceSection()}
+          </div>
         </div>
       </CardContent>
 
-      <CardFooter className="pt-0">
+      {/* Footer Section */}
+      <CardFooter className="p-4 pt-0">
         {addressError && (
           <div className="text-xs text-yellow-400 mb-2 flex items-center">
             <AlertTriangle className="h-3 w-3 mr-1" />
@@ -151,8 +154,8 @@ const PropertyCard = ({
         )}
         <Link href={linkHref} className={`w-full ${!addressToUse ? 'pointer-events-none opacity-70' : ''}`} onClick={handleDisabledClick}> 
           <Button 
-            className="w-full bg-crypto-dark hover:bg-crypto-dark/80 border border-crypto-light/30 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={!addressToUse} // Enable button if either address is available
+            className="w-full crypto-btn"
+            disabled={!addressToUse}
            > 
             <Tag className="mr-2 h-4 w-4" />
             View Property
