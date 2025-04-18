@@ -145,22 +145,47 @@ export const getPropertyByNFTAddress = async (nftAddress: string): Promise<Prope
 /**
  * Fetch property by token address
  */
-export const getPropertyByTokenAddress = async (tokenAddress: string): Promise<PropertyDto> => {
+export const getPropertyByTokenAddress = async (tokenAddress: string): Promise<PropertyDto | null> => {
   try {
     const apiUrl = CONTRACT_CONFIG.API_BASE_URL;
     const response = await fetch(`${apiUrl}/properties/token/${tokenAddress}`, {
-      signal: AbortSignal.timeout(30000), // 30 second timeout
-      next: { revalidate: 300 } // Revalidate cache every 5 minutes
+      signal: AbortSignal.timeout(30000),
+      next: { revalidate: 300 }
     });
-    
+
     if (!response.ok) {
-      throw new Error(`Failed to fetch property: ${response.status} ${response.statusText}`);
+      // Log the status and return null or throw specific error based on status
+      console.error(`Property API request failed for ${tokenAddress} with status ${response.status}`);
+      // Optionally handle specific statuses like 404 differently
+      if (response.status === 404) {
+        throw new Error(`Property not found for token address: ${tokenAddress}`);
+      } else {
+        throw new Error(`Failed to fetch property: ${response.status} ${response.statusText}`);
+      }
     }
-    
-    const data = await response.json();
-    return data;
+
+    // Read response body as text first
+    const responseText = await response.text();
+
+    // Check for empty response
+    if (!responseText || responseText.trim() === '') {
+      console.warn(`Empty response from property API for token ${tokenAddress}`);
+      return null; // Return null for empty responses, as property data is missing
+    }
+
+    // Try parsing the JSON
+    try {
+      const data: PropertyDto = JSON.parse(responseText);
+      return data;
+    } catch (jsonError) {
+      console.error(`Invalid JSON received from property API for token ${tokenAddress}:`, jsonError);
+      console.error(`Raw response text: ${responseText.substring(0, 500)}...`); // Log raw text for debugging
+      throw new Error(`Invalid data format received for token ${tokenAddress}.`);
+    }
+
   } catch (error) {
     console.error(`Error fetching property with token address ${tokenAddress}:`, error);
+    // Re-throw the error to be caught by the calling function (e.g., in DAO page)
     throw error;
   }
 };
