@@ -394,14 +394,6 @@ export default function DaoPage() {
                         <p className="text-gray-400">Review and vote on proposals for the Property DAO.</p>
           </div>
                     <div className="flex flex-col sm:flex-row gap-4">
-                        {/* Claim Rent Button */}
-                        <Button 
-                            onClick={handleClaimRent} 
-                            className="crypto-btn"
-                        >
-                            <Landmark className="h-4 w-4 mr-2" /> 
-                            Claim Rent (Placeholder)
-                        </Button>
                         {/* Create Proposal Button */}
                         <Button 
                             onClick={handleCreateProposalClick} 
@@ -438,23 +430,24 @@ export default function DaoPage() {
       </main>
       <Footer />
 
-            {/* Create Proposal Modal */} 
+            {/* Create Proposal Modal */}
             <Dialog open={showCreateProposalModal} onOpenChange={setShowCreateProposalModal}>
-                <DialogContent className="glass-card border-gray-700 sm:max-w-[525px]">
+                {/* Apply EXACT className from marketplace modal */}
+                <DialogContent className="sm:max-w-[700px] bg-gradient-to-br from-gray-900 to-gray-950 border-blue-900/50 rounded-xl backdrop-blur-lg shadow-xl">
                     <DialogHeader>
-                        <DialogTitle>Create New Proposal</DialogTitle>
-                        <DialogDescription>
+                        <DialogTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">Create New Proposal</DialogTitle>
+                        <DialogDescription className="text-gray-300">
                             Fill in the details below to submit a new governance proposal.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4">
-                        <CreateProposalForm 
+                        <CreateProposalForm
                             onSuccess={() => {
-                                setShowCreateProposalModal(false); // Close modal on success
-                                fetchProposalsAndDetails(); // Use the renamed function
-                            }} 
+                                setShowCreateProposalModal(false);
+                                fetchProposalsAndDetails();
+                            }}
                             onClose={() => setShowCreateProposalModal(false)}
-                            ownedTokens={userOwnedTokens} // Pass owned tokens to the form
+                            ownedTokens={userOwnedTokens}
                         />
                     </div>
                 </DialogContent>
