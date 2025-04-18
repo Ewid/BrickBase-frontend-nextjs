@@ -3,8 +3,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Providers } from "@/components/Providers";
 import RemoveWalletBadge from "@/components/RemoveWalletBadge";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
+
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,11 +21,9 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <Providers>
-          <Navbar />
           <main className="flex-grow">
             {children}
           </main>
-          <Footer />
           <RemoveWalletBadge />
         </Providers>
       </body>

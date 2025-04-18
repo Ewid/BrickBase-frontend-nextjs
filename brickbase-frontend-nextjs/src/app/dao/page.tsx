@@ -77,18 +77,18 @@ export default function DaoPage() {
     const [proposals, setProposals] = useState<Proposal[]>([]);
     const [propertyDetailsCache, setPropertyDetailsCache] = useState<Record<string, PropertyDto | null>>({});
     const [userOwnedTokens, setUserOwnedTokens] = useState<PropertyDto[]>([]); // State for user's owned tokens
-    const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
     const [isLoadingDetails, setIsLoadingDetails] = useState(false);
     const [isLoadingUserTokens, setIsLoadingUserTokens] = useState(false); // Loading state for user tokens
-    const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
     const [votingStates, setVotingStates] = useState<Record<number, boolean>>({});
     const [showCreateProposalModal, setShowCreateProposalModal] = useState(false);
 
     const fetchProposalsAndDetails = async () => {
-        setIsLoading(true);
+      setIsLoading(true);
         setIsLoadingDetails(true);
-        setError(null);
-        try {
+      setError(null);
+      try {
             const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
             // Fetch proposals
             const proposalsResponse = await fetch(`${apiUrl}/dao/proposals`);
@@ -136,7 +136,7 @@ export default function DaoPage() {
                 signal: AbortSignal.timeout(30000),
                 next: { revalidate: 300 } // Revalidate cache every 5 minutes
             });
-            if (!response.ok) {
+        if (!response.ok) {
                 throw new Error(`Failed to fetch user properties: ${response.status} ${response.statusText}`);
             }
             const data: PropertyDto[] = await response.json();
@@ -224,14 +224,14 @@ export default function DaoPage() {
             toast({ title: "Vote Cast Successfully!", description: `Your vote on proposal #${proposalId} has been recorded.` });
             fetchProposalsAndDetails(); // Use the renamed function
 
-        } catch (err: any) {
+      } catch (err: any) {
             console.error("Voting failed:", err);
             toast({
                 title: "Voting Failed",
                 description: err.reason || err.message || "An error occurred while casting your vote.",
                 variant: "destructive"
             });
-        } finally {
+      } finally {
              setVotingStates(prev => ({ ...prev, [proposalId]: false }));
         }
     };
@@ -280,7 +280,7 @@ export default function DaoPage() {
         const propertyImageUrl = propertyDetails?.metadata?.image ? tryConvertIpfsUrl(propertyDetails.metadata.image) : null;
         const propertyName = propertyDetails?.metadata?.name;
 
-        return (
+    return (
             <Card key={proposal.id} className="glass-card bg-gray-900/70 border border-white/10 overflow-hidden flex flex-col">
                 <CardHeader>
                     {/* Display Property Image and Name if available */} 
@@ -314,7 +314,7 @@ export default function DaoPage() {
                     <div className="flex justify-between items-start gap-2">
                         <CardTitle className="text-lg line-clamp-2 text-white">Proposal #{proposal.id}: {proposal.description}</CardTitle>
                         <Badge variant={getStatusVariant(proposal.state)}>{proposal.state}</Badge>
-                    </div>
+                </div>
                     <CardDescription className="text-xs text-gray-400 pt-1">
                         Proposed by: 
                         <a 
@@ -330,7 +330,7 @@ export default function DaoPage() {
                      <CardDescription className="text-xs text-gray-400 pt-1">
                         Voting ends: {formatTimestamp(proposal.endTime)}
                     </CardDescription>
-                </CardHeader>
+              </CardHeader>
                 <CardContent className="flex-grow space-y-4">
                     {/* Optional: Display target contract/function if needed */}
                     {/* <div className="text-xs text-gray-500 break-all">
@@ -349,7 +349,7 @@ export default function DaoPage() {
                             <Progress value={forPercentage} className="h-2.5" />
                         </div>
                     </div>
-                </CardContent>
+              </CardContent>
                 <CardFooter className="flex justify-end gap-3">
                     {isActive ? (
                         <>
@@ -372,27 +372,27 @@ export default function DaoPage() {
                             >
                                {votingStates[proposal.id] ? <Loader2 className="h-4 w-4 animate-spin"/> : <ThumbsUp className="h-4 w-4 mr-2" />}
                                 Vote For
-                            </Button>
+                     </Button>
                         </>
                     ) : (
                         <span className="text-sm text-gray-500 italic">
                             {isExpired && proposal.state !== 'Executed' ? 'Voting Ended' : `Status: ${proposal.state}`}
                         </span>
                     )}
-                </CardFooter>
+              </CardFooter>
             </Card>
-        );
+          );
     };
 
-    return (
-        <div className="min-h-screen bg-crypto-dark">
-            <Navbar />
+  return (
+    <div className="min-h-screen bg-crypto-dark">
+      <Navbar />
             <main className="pt-24 pb-10 px-6 max-w-5xl mx-auto">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12">
                     <div className="mb-6 md:mb-0">
-                        <h1 className="text-3xl font-bold mb-2">DAO <span className="text-gradient">Governance</span></h1>
+            <h1 className="text-3xl font-bold mb-2">DAO <span className="text-gradient">Governance</span></h1>
                         <p className="text-gray-400">Review and vote on proposals for the Property DAO.</p>
-                    </div>
+          </div>
                     <div className="flex flex-col sm:flex-row gap-4">
                         {/* Claim Rent Button */}
                         <Button 
@@ -408,10 +408,10 @@ export default function DaoPage() {
                             className="crypto-btn"
                         >
                             <PlusCircle className="h-4 w-4 mr-2" />
-                            Create Proposal
-                        </Button>
+                  Create Proposal
+                </Button>
                     </div>
-                </div>
+        </div>
 
                 {isLoading ? (
                     <div className="flex justify-center items-center py-20">
@@ -435,8 +435,8 @@ export default function DaoPage() {
                         {proposals.map(proposal => renderProposalCard({ proposal }))}
                     </div>
                 )}
-            </main>
-            <Footer />
+      </main>
+      <Footer />
 
             {/* Create Proposal Modal */} 
             <Dialog open={showCreateProposalModal} onOpenChange={setShowCreateProposalModal}>
@@ -459,6 +459,6 @@ export default function DaoPage() {
                     </div>
                 </DialogContent>
             </Dialog>
-        </div>
-    );
+    </div>
+  );
 } 

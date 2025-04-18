@@ -23,6 +23,7 @@ const Navbar = () => {
           <Link href="/properties" className="text-white hover:text-crypto-light transition-colors">Properties</Link>
           <Link href="/marketplace" className="text-white hover:text-crypto-light transition-colors">Marketplace</Link>
           <Link href="/dao" className="text-white hover:text-crypto-light transition-colors">Governance</Link>
+          <Link href="/portfolio" className="text-white hover:text-crypto-light transition-colors">My Portfolio</Link>
           <Link href="/about" className="text-white hover:text-crypto-light transition-colors">About</Link>
         </div>
 
