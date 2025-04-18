@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Navbar from '@/components/Navbar'; // Assuming Navbar is needed here too
-import Footer from '@/components/Footer'; // Assuming Footer is needed here too
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardContent, CardFooter, CardTitle, CardDescription } from '@/components/ui/card';
 import { Loader2, AlertCircle, Landmark, Wallet, Layers, Percent } from 'lucide-react';
@@ -19,8 +19,8 @@ import Link from 'next/link';
 interface PortfolioProperty extends PropertyDto {
     formattedBalance: string;
     ownershipPercentage: number;
-    claimableRentFormatted?: string;
-    isClaimingRent?: boolean;
+    claimableRentFormatted: string | undefined;
+    isClaimingRent: boolean;
 }
 
 // Helper function
@@ -67,45 +67,46 @@ export default function PortfolioPage() {
             // 2. Fetch balance, percentage, and claimable rent for each
             const enrichedPortfolioPromises = ownedProperties.map(async (prop) => {
                 const tokenAddress = prop.tokenAddress || prop.propertyDetails?.associatedPropertyToken;
-                if (!tokenAddress) return null; // Skip if no token address
+                if (!tokenAddress) return null;
 
                 try {
-                    // Fetch balance (reuse marketplace service function for now)
                     const balanceWei = await getTokenBalance(tokenAddress, account);
                     const formattedBalance = formatCurrency(balanceWei, 18);
 
                     // Calculate ownership percentage (totalSupply should be in PropertyDto)
                     const totalSupply = ethers.getBigInt(prop.totalSupply || '0');
                     const balance = ethers.getBigInt(balanceWei);
-                    const ownershipPercentage = totalSupply > 0 ? parseFloat(((balance * 10000n) / totalSupply).toString()) / 100 : 0;
+                    const ownershipPercentage = totalSupply > BigInt(0) ? 
+                        parseFloat(((balance * BigInt(10000)) / totalSupply).toString()) / 100 : 0;
 
                     // Fetch claimable rent
                     let claimableRentFormatted: string | undefined = undefined;
                     try {
                         const rentData: RentDto = await getClaimableRent(account, tokenAddress);
                         if (ethers.getBigInt(rentData.claimableAmount) > 0) {
-                            claimableRentFormatted = formatCurrency(rentData.claimableAmount, 6); // Assuming USDC (6 decimals)
+                            claimableRentFormatted = formatCurrency(rentData.claimableAmount, 6);
                         }
                     } catch (rentError) {
                         console.warn(`Could not fetch claimable rent for ${tokenAddress}:`, rentError);
                     }
 
-                    return {
+                    const enrichedProperty: PortfolioProperty = {
                         ...prop,
                         formattedBalance,
                         ownershipPercentage,
                         claimableRentFormatted,
-                        isClaimingRent: false // Initialize claiming state
+                        isClaimingRent: false
                     };
+
+                    return enrichedProperty;
                 } catch (propError) {
                     console.error(`Failed to enrich property ${prop.id} (${tokenAddress}):`, propError);
-                    return null; // Skip this property on error
+                    return null;
                 }
             });
 
             const enrichedResults = await Promise.all(enrichedPortfolioPromises);
             const validPortfolio = enrichedResults.filter((p): p is PortfolioProperty => p !== null);
-
             setPortfolio(validPortfolio);
 
         } catch (err: any) {
@@ -275,9 +276,9 @@ export default function PortfolioPage() {
         );
     };
 
-    // Note: Removed Navbar and Footer from here as they are now in layout.tsx
     return (
-        <div className="min-h-screen bg-crypto-dark flex flex-col">
+        <div className="min-h-screen bg-crypto-dark">
+            <Navbar />
             <main className="flex-grow pt-24 pb-10 px-6 max-w-7xl mx-auto w-full">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12">
                     <div className="mb-6 md:mb-0">
@@ -295,8 +296,8 @@ export default function PortfolioPage() {
                 </div>
 
                 {renderPortfolio()}
-
             </main>
+            <Footer />
         </div>
     );
 } 
