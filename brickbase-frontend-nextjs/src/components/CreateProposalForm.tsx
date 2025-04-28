@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,6 +15,23 @@ import { toast } from '@/components/ui/use-toast';
 import { PropertyDto } from '@/types/dtos';
 import Image from 'next/image';
 import { tryConvertIpfsUrl } from '@/services/marketplace';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+// --- Define Proposal Categories ---
+const proposalCategories = [
+    { key: 'rent', label: 'Rent Price Adjustment' },
+    { key: 'renovation', label: 'Property Renovation/Maintenance' },
+    { key: 'management', label: 'Update Property Management' },
+    { key: 'reserve', label: 'DAO Reserve Fund Allocation' },
+    { key: 'other', label: 'Other (Specify in Description)' },
+];
+// --- End Proposal Categories ---
 
 interface CreateProposalFormProps {
   ownedTokens: PropertyDto[];
@@ -38,31 +55,38 @@ const formatTokenId = (tokenId: string | number | undefined): string => {
   return idStr || 'Unknown';
 };
 
+// Simplify steps back to 3
 type Step = 'selectProperty' | 'enterDetails' | 'submit';
 
 const CreateProposalForm = ({ ownedTokens, onSuccess, onClose }: CreateProposalFormProps) => {
   const { account } = useAccount();
   const [step, setStep] = useState<Step>('selectProperty');
   const [selectedProperty, setSelectedProperty] = useState<PropertyDto | null>(null);
+  const [proposalType, setProposalType] = useState<string>(''); // New state for category
   const [description, setDescription] = useState('');
-  const [targetContract, setTargetContract] = useState('');
-  const [functionCallData, setFunctionCallData] = useState('0x');
+  const [targetContract, setTargetContract] = useState(CONTRACT_CONFIG.PROPERTY_DAO_ADDRESS || '0x0000000000000000000000000000000000000000'); // Default to DAO itself or zero address
+  const [functionCallData, setFunctionCallData] = useState('0x'); // Default to empty call
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   const handlePropertySelect = (property: PropertyDto) => {
     setSelectedProperty(property);
-    setStep('enterDetails');
+    setStep('enterDetails'); // Go directly to details after property selection
     setError(null); // Clear errors when moving step
   };
 
   const handleBack = () => {
     if (step === 'enterDetails') {
-      setStep('selectProperty');
+      setStep('selectProperty'); // Go back to property selection
       setSelectedProperty(null);
+      setProposalType('');
+      setDescription('');
+      setTargetContract(CONTRACT_CONFIG.PROPERTY_DAO_ADDRESS || '0x0000000000000000000000000000000000000000');
+      setFunctionCallData('0x');
       setError(null);
-    }
+    } 
+    // Removed else if for 'selectAction' step
   };
 
   const getDaoContract = async (signer: ethers.Signer) => {
@@ -76,8 +100,10 @@ const CreateProposalForm = ({ ownedTokens, onSuccess, onClose }: CreateProposalF
     setError(null);
     setSuccess(false);
 
-    if (!selectedProperty || !description || !targetContract) {
-      setError('Please fill in all required fields: Description and Target Contract.');
+    // Simplified validation
+    if (!selectedProperty) {
+      setError('Please select the property this proposal relates to.');
+      setStep('selectProperty');
       return;
     }
 
@@ -87,35 +113,51 @@ const CreateProposalForm = ({ ownedTokens, onSuccess, onClose }: CreateProposalF
         return;
     }
 
-    if (!ethers.isAddress(targetContract)) {
-        setError('Invalid address format for Target Contract.');
-        return;
-    }
-    
-    if (!functionCallData.startsWith('0x')) {
-        setError('Function Call Data must start with 0x.');
+    if (!proposalType) {
+        setError('Please select a proposal type/category.');
         return;
     }
 
-    setStep('submit');
+    if (!description) {
+      setError('Please enter a description for the proposal.');
+      return;
+    }
+
+    // Basic validation for optional fields if they are filled
+    if (targetContract && !ethers.isAddress(targetContract)) {
+        setError('Invalid address format for Target Contract.');
+        return;
+    }
+    if (functionCallData && !functionCallData.startsWith('0x')) {
+        setError('Function Call Data must start with 0x if provided.');
+        return;
+    }
+
+    setStep('submit'); // Keep submit step for final confirmation/loading state
     setIsSubmitting(true);
 
     try {
       if (!window.ethereum) throw new Error("No Ethereum provider found.");
       const provider = new ethers.BrowserProvider(window.ethereum as any);
       const signer = await provider.getSigner();
-      const contract = await getDaoContract(signer);
+      const daoContract = await getDaoContract(signer);
 
-      console.log(`Creating proposal: 
+      // --- Use manually entered target and calldata ---
+      const finalTarget = targetContract || ethers.ZeroAddress; // Use ZeroAddress if empty
+      const finalCalldata = functionCallData || '0x';
+      // --- End --- 
+
+      console.log(`Creating proposal:
+        Type: ${proposalType}
         Description: ${description}
-        Target: ${targetContract}
-        Call Data: ${functionCallData}
-        Token Address: ${propertyTokenAddress}`);
+        Target: ${finalTarget}
+        Call Data: ${finalCalldata}
+        Token Address (for voting): ${propertyTokenAddress}`);
 
-      const tx = await contract.createProposal(
-          description,
-          targetContract,
-          functionCallData,
+      const tx = await daoContract.createProposal(
+          description, // Pass full description
+          finalTarget,
+          finalCalldata,
           propertyTokenAddress
       );
 
@@ -145,51 +187,43 @@ const CreateProposalForm = ({ ownedTokens, onSuccess, onClose }: CreateProposalF
     }
   };
 
-  // Step Indicator Logic - Updated Styles
-  const renderStepIndicator = () => (
-    // Match background/border of CreateListingForm indicator
-    <div className="bg-blue-900/10 rounded-xl p-4 border border-blue-900/20 backdrop-blur-md mb-6">
-      <div className="space-y-1 mb-3">
-        {/* Keep title style consistent */}
-        <h4 className="text-sm font-medium text-blue-300">Proposal Creation Steps</h4> 
-        <p className="text-xs text-gray-400">
-          Select a property, enter proposal details, and submit the transaction.
-        </p>
-      </div>
-      {/* Step 1 */}
-      <div className="flex items-center gap-3">
-        <div className={`rounded-full w-8 h-8 flex items-center justify-center ${step === 'selectProperty' || step === 'enterDetails' || step === 'submit' ? 'bg-blue-500/20 text-blue-300' : 'bg-gray-800 text-gray-500'}`}>1</div>
-        <div className="flex-1">
-          <p className="text-sm font-medium text-gray-200">Select Property</p>
-          <p className="text-xs text-gray-400">Choose the property token for voting</p>
-        </div>
-         {step !== 'selectProperty' && <Check className="h-5 w-5 text-green-400" />}
-      </div>
-      {/* Connector */}
-      <div className="h-6 flex justify-center"><div className="border-l border-blue-800/30 h-full"></div></div> 
-      {/* Step 2 */}
-      <div className="flex items-center gap-3">
-        <div className={`rounded-full w-8 h-8 flex items-center justify-center ${step === 'enterDetails' || step === 'submit' ? 'bg-blue-500/20 text-blue-300' : 'bg-gray-800 text-gray-500'}`}>2</div>
-        <div className="flex-1">
-          <p className="text-sm font-medium text-gray-200">Enter Details</p>
-          <p className="text-xs text-gray-400">Describe your proposal</p>
-        </div>
-         {step === 'submit' && <Check className="h-5 w-5 text-green-400" />}
-      </div>
-      {/* Connector */}
-      <div className="h-6 flex justify-center"><div className="border-l border-blue-800/30 h-full"></div></div>
-      {/* Step 3 */}
-      <div className="flex items-center gap-3">
-        <div className={`rounded-full w-8 h-8 flex items-center justify-center ${step === 'submit' ? 'bg-blue-500/20 text-blue-300' : 'bg-gray-800 text-gray-500'}`}>3</div>
-        <div className="flex-1">
-          <p className="text-sm font-medium text-gray-200">Submit Proposal</p>
-          <p className="text-xs text-gray-400">Confirm transaction in your wallet</p>
-        </div>
-         {isSubmitting && step === 'submit' && <Loader2 className="animate-spin h-5 w-5 text-blue-400" />}
-         {success && <Check className="h-5 w-5 text-green-400" />}
-      </div>
-    </div>
-  );
+  // Step Indicator Logic - Simplify back to 3 steps
+  const renderStepIndicator = () => {
+      const stepsConfig = [
+          { key: 'selectProperty', label: 'Select Property', description: 'Choose the property token for voting', completed: step !== 'selectProperty' },
+          // Remove 'Select Action' step
+          { key: 'enterDetails', label: 'Enter Details', description: 'Describe your proposal', completed: step === 'submit' },
+          { key: 'submit', label: 'Submit Proposal', description: 'Confirm transaction in your wallet', completed: success }
+      ];
+      const currentStepIndex = stepsConfig.findIndex(s => s.key === step);
+
+      return (
+          <div className="bg-blue-900/10 rounded-xl p-4 border border-blue-900/20 backdrop-blur-md mb-6">
+              <div className="space-y-1 mb-3">
+                  <h4 className="text-sm font-medium text-blue-300">Proposal Creation Steps</h4> 
+                  <p className="text-xs text-gray-400">
+                      Follow the steps to create and submit your governance proposal.
+                  </p>
+              </div>
+              {stepsConfig.map((s, index) => (
+                  <React.Fragment key={s.key}>
+                      <div className="flex items-center gap-3">
+                          <div className={`rounded-full w-8 h-8 flex items-center justify-center ${index <= currentStepIndex || s.completed ? 'bg-blue-500/20 text-blue-300' : 'bg-gray-800 text-gray-500'}`}>
+                              {index + 1}
+                          </div>
+                          <div className="flex-1">
+                              <p className="text-sm font-medium text-gray-200">{s.label}</p>
+                              <p className="text-xs text-gray-400">{s.description}</p>
+                          </div>
+                          {index < stepsConfig.length - 1 && (
+                              <div className="h-6 flex justify-center ml-[15px] w-px"><div className="border-l border-blue-800/30 h-full"></div></div>
+                          )}
+                      </div>
+                  </React.Fragment>
+              ))}
+          </div>
+      );
+  };
 
   // --- Step 1: Select Property - Updated Styles ---
   if (step === 'selectProperty') {
@@ -259,8 +293,8 @@ const CreateProposalForm = ({ ownedTokens, onSuccess, onClose }: CreateProposalF
     );
   }
 
-  // --- Step 2 & 3: Enter Details & Submit - Updated Input/Textarea Styles ---
-  if ((step === 'enterDetails' || step === 'submit') && selectedProperty) {
+  // --- Step 2 & 3: Enter Details & Submit (combined Type selection here) ---
+  if ((step === 'enterDetails' || step === 'submit') && selectedProperty) { // Removed selectedAction check
     const imageUrl = selectedProperty.metadata?.image ? tryConvertIpfsUrl(selectedProperty.metadata.image) : null;
     const tokenAddress = selectedProperty.tokenAddress || selectedProperty.propertyDetails?.associatedPropertyToken;
 
@@ -296,14 +330,31 @@ const CreateProposalForm = ({ ownedTokens, onSuccess, onClose }: CreateProposalF
             </div>
             <div>
                 <h3 className="text-base font-medium text-gray-100">{selectedProperty.metadata?.name || 'Selected Property'}</h3>
-                <p className="text-xs text-gray-400">Token Addr: {shortenAddress(tokenAddress || '')}</p>
+                <p className="text-xs text-gray-400">Voting Token: {shortenAddress(tokenAddress || '')}</p>
             </div>
           </div>
         </div>
 
+        {/* Add Proposal Type Dropdown */}
+        <div>
+            <Label htmlFor="proposalType" className="text-sm mb-2 block font-medium text-gray-200">Proposal Type *</Label>
+            <Select onValueChange={setProposalType} value={proposalType} disabled={isSubmitting}>
+                <SelectTrigger className="w-full bg-gray-800/50 border-gray-700 text-white">
+                    <SelectValue placeholder="Select proposal category..." />
+                </SelectTrigger>
+                <SelectContent className="bg-gray-800 border-gray-700 text-white">
+                    {proposalCategories.map(cat => (
+                        <SelectItem key={cat.key} value={cat.key} className="hover:bg-gray-700 focus:bg-gray-700">
+                            {cat.label}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </div>
+
         {/* Form Fields - Use consistent input/textarea styling */}
         <div>
-          <Label htmlFor="description" className="text-sm mb-2 block font-medium text-gray-200">Description</Label>
+          <Label htmlFor="description" className="text-sm mb-2 block font-medium text-gray-200">Description *</Label>
           <Textarea
             id="description"
             value={description}
@@ -315,32 +366,34 @@ const CreateProposalForm = ({ ownedTokens, onSuccess, onClose }: CreateProposalF
             required
           />
         </div>
-        <div>
-          <Label htmlFor="targetContract" className="text-sm mb-2 block font-medium text-gray-200">Target Contract Address</Label>
-          <Input
-            id="targetContract"
-            type="text"
-            value={targetContract}
-            onChange={(e) => setTargetContract(e.target.value)}
-            placeholder="0x... (Contract to call if proposal passes)"
-            className="mt-1 bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-white placeholder:text-gray-500"
-            disabled={isSubmitting}
-            required
-          />
-        </div>
-        <div>
-          <Label htmlFor="functionCallData" className="text-sm mb-2 block font-medium text-gray-200">Function Call Data (Optional)</Label>
-          <Textarea
-            id="functionCallData"
-            value={functionCallData}
-            onChange={(e) => setFunctionCallData(e.target.value)}
-            placeholder="0x... (Encoded function call data)"
-            className="mt-1 font-mono text-xs bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-white placeholder:text-gray-500"
-            rows={3}
-            disabled={isSubmitting}
-          />
-          {/* Fix Linter Error for Apostrophes */}
-          <p className="text-xs text-gray-400 mt-1">Optional: Encoded data for the function call. Leave as &apos;0x&apos; if no specific function needs to be called.</p>
+
+        {/* Re-introduce optional/advanced Target Contract and Calldata inputs */}
+        <div className="border-t border-gray-700/50 pt-4 mt-4 space-y-4">
+             <p className="text-xs text-gray-400">Optional: For proposals involving direct contract calls (advanced users).</p>
+             <div>
+                 <Label htmlFor="targetContract" className="text-sm mb-2 block font-medium text-gray-300">Target Contract Address (Optional)</Label>
+                 <Input
+                     id="targetContract"
+                     type="text"
+                     value={targetContract}
+                     onChange={(e) => setTargetContract(e.target.value)}
+                     placeholder="0x... (Defaults to DAO contract)"
+                     className="mt-1 bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-white placeholder:text-gray-500"
+                     disabled={isSubmitting}
+                 />
+             </div>
+             <div>
+                 <Label htmlFor="functionCallData" className="text-sm mb-2 block font-medium text-gray-300">Function Call Data (Optional)</Label>
+                 <Textarea
+                     id="functionCallData"
+                     value={functionCallData}
+                     onChange={(e) => setFunctionCallData(e.target.value)}
+                     placeholder="0x... (Defaults to empty call)"
+                     className="mt-1 font-mono text-xs bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-white placeholder:text-gray-500"
+                     rows={2}
+                     disabled={isSubmitting}
+                 />
+             </div>
         </div>
 
         {/* Error Alert - Keep styling */}
@@ -365,7 +418,7 @@ const CreateProposalForm = ({ ownedTokens, onSuccess, onClose }: CreateProposalF
           <Button 
             type="submit" 
             className="crypto-btn"
-            disabled={isSubmitting || success || !description || !targetContract || !selectedProperty}
+            disabled={isSubmitting || success || !description || !proposalType || !selectedProperty}
           >
             {isSubmitting ? (
               <>
