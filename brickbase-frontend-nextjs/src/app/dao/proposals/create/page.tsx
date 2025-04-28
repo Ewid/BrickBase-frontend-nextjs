@@ -18,49 +18,48 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
-import { Loader2, AlertTriangle, ArrowLeft, Send } from 'lucide-react';
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Loader2, ArrowLeft, Send } from 'lucide-react';
 import Link from 'next/link';
 import { useAccount, useWriteContract } from 'wagmi';
-import DAO_ABI from '@/abis/PropertyDAO.json'; // Import the ABI
+import DAO_ABI from '@/abis/PropertyDAO.json'; 
 import { toast } from "sonner";
-import { parseEther } from 'ethers'; // For handling ETH values if needed
 import { useRouter } from 'next/navigation';
 
-// Define interface for toast messages (can be reused or defined locally)
+
 interface ToastMessage {
     type: 'success' | 'error' | 'info' | 'loading';
     title: string;
     description?: string;
-    id?: string; // Optional ID for loading toasts
+    id?: string; 
 }
 
-// --- Constants --- TODO: Move to config/env
+
 const DAO_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_DAO_CONTRACT_ADDRESS as `0x${string}` | undefined;
 
-// --- Zod Schema for Form Validation ---
+
 const proposalFormSchema = z.object({
   targetAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, { message: "Invalid Ethereum address" }),
-  // Assuming value is always 0 for now, can add field if needed
-  // value: z.string().refine(val => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, { message: "Invalid value" }),
-  callData: z.string().regex(/^0x[a-fA-F0-9]*$/, { message: "Invalid hex data (must start with 0x)" }).min(4, { message: "Call data seems too short" }), // Basic hex validation
+  
+  
+  callData: z.string().regex(/^0x[a-fA-F0-9]*$/, { message: "Invalid hex data (must start with 0x)" }).min(4, { message: "Call data seems too short" }), 
   description: z.string().min(10, { message: "Description must be at least 10 characters." }).max(5000, { message: "Description cannot exceed 5000 characters." }),
 });
 
 type ProposalFormValues = z.infer<typeof proposalFormSchema>;
 
-// --- Component --- 
+
 const CreateProposalPage = () => {
   const { address: userAddress, isConnected } = useAccount();
-  const router = useRouter(); // Initialize router
-  // Add useWriteContract setup for proposal creation
+  const router = useRouter(); 
+  
   const { writeContract, data: hash, isPending, isSuccess, isError, error: writeError } = useWriteContract(); 
-  // Rename state to avoid conflict with isPending from hook
+  
   const [isSubmittingForm, setIsSubmittingForm] = useState(false); 
-  // Add state for toast messages
+  
   const [toastMessage, setToastMessage] = useState<ToastMessage | null>(null);
 
-  // React Hook Form setup
+  
   const form = useForm<ProposalFormValues>({
     resolver: zodResolver(proposalFormSchema),
     defaultValues: {
@@ -71,10 +70,10 @@ const CreateProposalPage = () => {
     mode: "onChange",
   });
 
-  // --- Form Submission Handler ---
+  
   const onSubmit = async (data: ProposalFormValues) => {
     console.log("Form submitted:", data);
-    setToastMessage(null); // Clear previous toasts
+    setToastMessage(null); 
     
     if (!isConnected || !userAddress) {
         setToastMessage({ type: 'error', title: "Connect Wallet", description: "Please connect your wallet to create a proposal." });
@@ -86,7 +85,7 @@ const CreateProposalPage = () => {
         return;
     }
 
-    // Trigger writeContract
+    
     writeContract({
         address: DAO_CONTRACT_ADDRESS,
         abi: DAO_ABI,
@@ -100,7 +99,7 @@ const CreateProposalPage = () => {
     });
   };
 
-  // UseEffect to display toast messages
+  
   useEffect(() => {
     if (toastMessage) {
         switch (toastMessage.type) {
@@ -117,21 +116,21 @@ const CreateProposalPage = () => {
                 toast.loading(toastMessage.title, { id: toastMessage.id, description: toastMessage.description });
                 break;
         }
-        // Don't reset immediately if it's a loading toast that will be updated
+        
         if (toastMessage.type !== 'loading') {
-           setTimeout(() => setToastMessage(null), 0); // Reset with slight delay
+           setTimeout(() => setToastMessage(null), 0); 
         }
     }
   }, [toastMessage]);
 
-   // useEffect to handle useWriteContract status and set toast state
+   
    useEffect(() => {
         if (isPending) {
             setIsSubmittingForm(true);
             setToastMessage({ type: 'loading', title: "Submitting proposal transaction...", id: 'propose-toast' });
         }
         if (isSuccess) {
-            setTimeout(() => setIsSubmittingForm(false), 0); // Defer state update
+            setTimeout(() => setIsSubmittingForm(false), 0); 
             setToastMessage({ 
                 type: 'success', 
                 title: "Proposal submitted successfully!", 
@@ -142,26 +141,26 @@ const CreateProposalPage = () => {
             setTimeout(() => router.push('/dao'), 2000);
         }
         if (isError) {
-            setTimeout(() => setIsSubmittingForm(false), 0); // Defer state update
+            setTimeout(() => setIsSubmittingForm(false), 0); 
             
             let toastTitle = "Proposal failed";
             let toastDescription = writeError?.message || 'An unknown error occurred.';
-            let isHandledError = false; // Flag for handled errors
+            let isHandledError = false; 
 
-            // Check for user rejection patterns
-            // @ts-ignore - Accessing internal properties for error code check
-            if (writeError?.cause?.code === 4001 || writeError?.message?.includes('User rejected') || writeError?.message?.includes('User denied')) {
+            
+            
+            if (writeError?.message?.includes('User rejected') || writeError?.message?.includes('User denied')) {
                  toastTitle = "Transaction Rejected";
                  toastDescription = "You rejected the transaction in your wallet.";
                  isHandledError = true;
-            // Check for insufficient tokens
-            } else if (writeError?.message?.includes('You Must Own At Least 5% of a property to create a proposal')) {
+            
+            } else if (writeError?.message?.includes('You Must Own At Least 10% of a property to create a proposal')) {
                 toastTitle = "Insufficient Tokens";
                 toastDescription = "You do not hold enough governance tokens to create a proposal.";
                 isHandledError = true;
             }
 
-            // Only log unexpected errors to console
+            
             if (!isHandledError) {
                 console.error("Proposal Error:", writeError); 
             }
@@ -175,7 +174,7 @@ const CreateProposalPage = () => {
         }
     }, [isPending, isSuccess, isError, hash, writeError, form, router]); 
 
-  // --- Render Logic --- 
+  
   return (
     <div className="min-h-screen bg-crypto-dark text-white">
       <Navbar />
@@ -239,7 +238,6 @@ const CreateProposalPage = () => {
                         />
                     </CardContent>
                     <CardFooter className="bg-gray-800/30 px-6 py-4 flex justify-end">
-                         {/* Disable button based on transaction pending state or if wallet not connected */}
                         <Button type="submit" className="crypto-btn" disabled={isPending || isSubmittingForm || !isConnected}>
                            {(isPending || isSubmittingForm) ? (
                             <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>

@@ -5,53 +5,51 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardContent, CardFooter, CardTitle, CardDescription } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress'; // Assuming you have a Progress component
 import { Badge } from '@/components/ui/badge';
-import { Loader2, AlertCircle, ThumbsUp, ThumbsDown, ExternalLink, Landmark, PlusCircle } from 'lucide-react';
+import { Loader2, AlertCircle, ThumbsUp, ThumbsDown, ExternalLink, PlusCircle } from 'lucide-react';
 import { useAccount } from '@/hooks/useAccount';
 import { ethers } from 'ethers';
-import CONTRACT_CONFIG from '@/config/contracts'; // Assuming DAO address is in config
-import PropertyDAOABI from '@/abis/PropertyDAO.json'; // Assuming you have the DAO ABI
-import { toast } from 'sonner'; // Import sonner
-import { PropertyDto } from '@/types/dtos'; // Import PropertyDto
-import { getPropertyByTokenAddress } from '@/services/property'; // Import property service function
-import { tryConvertIpfsUrl } from '@/services/marketplace'; // For image URLs
-import Image from 'next/image'; // For displaying images
-import CreateProposalForm from '@/components/CreateProposalForm'; // Import the new form
+import CONTRACT_CONFIG from '@/config/contracts'; 
+import PropertyDAOABI from '@/abis/PropertyDAO.json'; 
+import { toast } from 'sonner'; 
+import { PropertyDto } from '@/types/dtos'; 
+import { getPropertyByTokenAddress } from '@/services/property'; 
+import { tryConvertIpfsUrl } from '@/services/marketplace'; 
+import Image from 'next/image'; 
+import CreateProposalForm from '@/components/CreateProposalForm'; 
 import {
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog"; // Assuming shadcn dialog components
-import { getTokenBalance, formatCurrency } from "@/services/marketplace"; // For fallback balance check
+} from "@/components/ui/dialog"; 
+import { getTokenBalance } from "@/services/marketplace"; 
 
-// Interface based on the provided API response
+
 interface Proposal {
     id: number;
     proposer: string;
     description: string;
-    targetContract: string; // Might not be displayed directly but needed for context/execution
-    functionCall: string;   // Might not be displayed directly
-    propertyTokenAddress?: string; // Added optional field for associated property
-    votesFor: string;       // BigInt as string
-    votesAgainst: string;   // BigInt as string
-    startTime: number;      // Unix timestamp
-    endTime: number;        // Unix timestamp
+    targetContract: string; 
+    functionCall: string;   
+    propertyTokenAddress?: string; 
+    votesFor: string;       
+    votesAgainst: string;   
+    startTime: number;      
+    endTime: number;        
     executed: boolean;
     passed: boolean;
-    state: string;          // e.g., "Active", "Succeeded", "Defeated", "Executed"
+    state: string;          
 }
 
-// Helper function to shorten addresses
+
 function shortenAddress(address: string): string {
   if (!address || !address.startsWith('0x')) return 'Unknown';
   return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
 }
 
-// Helper function to format dates
+
 function formatTimestamp(timestamp: number): string {
   if (!timestamp) return 'N/A';
   return new Date(timestamp * 1000).toLocaleString(undefined, { 
@@ -60,19 +58,19 @@ function formatTimestamp(timestamp: number): string {
   });
 }
 
-// Helper function to get status badge styles
+
 function getStatusVariant(state: string): "default" | "secondary" | "destructive" | "outline" {
     switch (state?.toLowerCase()) {
-        case 'active': return 'default'; // Blue/Primary
+        case 'active': return 'default'; 
         case 'succeeded':
-        case 'executed': return 'secondary'; // Green (using secondary for now, adjust if you have a green variant)
-        case 'defeated': return 'destructive'; // Red
-        case 'queued': return 'outline'; // Gray/Outline
+        case 'executed': return 'secondary'; 
+        case 'defeated': return 'destructive'; 
+        case 'queued': return 'outline'; 
         default: return 'outline';
     }
 }
 
-// Define interface for toast messages
+
 interface ToastMessage {
     type: 'success' | 'error' | 'info';
     title: string;
@@ -83,14 +81,14 @@ export default function DaoPage() {
     const { account, isConnected } = useAccount();
     const [proposals, setProposals] = useState<Proposal[]>([]);
     const [propertyDetailsCache, setPropertyDetailsCache] = useState<Record<string, PropertyDto | null>>({});
-    const [userOwnedTokens, setUserOwnedTokens] = useState<PropertyDto[]>([]); // State for user's owned tokens
+    const [userOwnedTokens, setUserOwnedTokens] = useState<PropertyDto[]>([]); 
     const [isLoading, setIsLoading] = useState(true);
     const [isLoadingDetails, setIsLoadingDetails] = useState(false);
-    const [isLoadingUserTokens, setIsLoadingUserTokens] = useState(false); // Loading state for user tokens
+    const [isLoadingUserTokens, setIsLoadingUserTokens] = useState(false); 
     const [error, setError] = useState<string | null>(null);
     const [votingStates, setVotingStates] = useState<Record<number, boolean>>({});
     const [showCreateProposalModal, setShowCreateProposalModal] = useState(false);
-    // Add state for toast messages
+    
     const [toastMessage, setToastMessage] = useState<ToastMessage | null>(null);
 
     const fetchProposalsAndDetails = async () => {
@@ -98,8 +96,8 @@ export default function DaoPage() {
         setIsLoadingDetails(true);
       setError(null);
       try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
-            // Fetch proposals
+            const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+            
             const proposalsResponse = await fetch(`${apiUrl}/dao/proposals`);
             if (!proposalsResponse.ok) {
                 throw new Error(`Failed to fetch proposals: ${proposalsResponse.statusText}`);
@@ -107,7 +105,7 @@ export default function DaoPage() {
             const proposalsData: Proposal[] = await proposalsResponse.json();
             setProposals(proposalsData);
 
-            // Fetch Property Details for proposals
+            
             const tokenAddresses = Array.from(new Set(proposalsData.map(p => p.propertyTokenAddress).filter(Boolean))) as string[];
             const detailsPromises = tokenAddresses.map(addr =>
                 getPropertyByTokenAddress(addr).catch(err => {
@@ -133,17 +131,17 @@ export default function DaoPage() {
         }
     };
 
-    // Fetch user's owned property tokens (similar to MarketplacePage)
+    
     const fetchUserOwnedTokens = async () => {
         if (!account) return;
         setIsLoadingUserTokens(true);
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
         try {
-            // Prefer the dedicated endpoint
+            
             console.log(`DAO Page: Fetching properties owned by ${account}...`);
             const response = await fetch(`${apiUrl}/properties/owned/${account}`, {
                 signal: AbortSignal.timeout(30000),
-                next: { revalidate: 300 } // Revalidate cache every 5 minutes
+                next: { revalidate: 300 } 
             });
         if (!response.ok) {
                 throw new Error(`Failed to fetch user properties: ${response.status} ${response.statusText}`);
@@ -153,7 +151,7 @@ export default function DaoPage() {
             setUserOwnedTokens(data);
         } catch (apiError) {
             console.warn('DAO Page: API endpoint /properties/owned failed, falling back to manual balance check:', apiError);
-            // Fallback logic (might be less efficient)
+            
             try {
                  const allPropertiesResponse = await fetch(`${apiUrl}/properties`, {
                     signal: AbortSignal.timeout(30000),
@@ -170,7 +168,7 @@ export default function DaoPage() {
                     try {
                         const balance = await getTokenBalance(tokenAddress, account);
                         if (ethers.getBigInt(balance) > 0) {
-                            return property; // Keep the original PropertyDto structure
+                            return property; 
                         }
                         return null;
                     } catch (balanceError) {
@@ -195,13 +193,13 @@ export default function DaoPage() {
     };
 
     useEffect(() => {
-        fetchProposalsAndDetails(); // Fetch proposals and their details
+        fetchProposalsAndDetails(); 
         if (isConnected && account) {
-            fetchUserOwnedTokens(); // Fetch user tokens when connected
+            fetchUserOwnedTokens(); 
         }
-    }, [account, isConnected]); // Add dependencies
+    }, [account, isConnected]); 
 
-    // UseEffect to display toast messages
+    
     useEffect(() => {
         if (toastMessage) {
             switch (toastMessage.type) {
@@ -215,14 +213,14 @@ export default function DaoPage() {
                     toast.info(toastMessage.title, { description: toastMessage.description });
                     break;
             }
-            setToastMessage(null); // Reset after showing
+            setToastMessage(null); 
         }
     }, [toastMessage]);
 
-    // --- Smart Contract Interactions (Stubs) ---
+    
 
     const getDaoContract = async (signer: ethers.Signer) => {
-        const daoAddress = CONTRACT_CONFIG.PROPERTY_DAO_ADDRESS; // Make sure this exists in your config
+        const daoAddress = CONTRACT_CONFIG.PROPERTY_DAO_ADDRESS; 
         if (!daoAddress) throw new Error("DAO Contract address not configured.");
         return new ethers.Contract(daoAddress, PropertyDAOABI, signer);
     };
@@ -232,7 +230,7 @@ export default function DaoPage() {
             setToastMessage({ type: 'error', title: "Connect Wallet", description: "Please connect your wallet to vote." });
             return;
         }
-        if (votingStates[proposalId]) return; // Prevent double voting while processing
+        if (votingStates[proposalId]) return; 
 
         setVotingStates(prev => ({ ...prev, [proposalId]: true }));
         try {
@@ -246,17 +244,17 @@ export default function DaoPage() {
 
             setToastMessage({ type: 'info', title: "Transaction Submitted", description: "Waiting for confirmation..." });
 
-            await tx.wait(); // Wait for transaction confirmation
+            await tx.wait(); 
 
             setToastMessage({ type: 'success', title: "Vote Cast Successfully!", description: `Your vote on proposal #${proposalId} has been recorded.` });
-            fetchProposalsAndDetails(); // Use the renamed function
+            fetchProposalsAndDetails(); 
 
         } catch (err: any) {
-            // console.error("Voting failed:", err); // Keep commented out
+            
             let toastTitle = "Voting Failed";
             let toastDescription = err.reason || err.message || "An error occurred while casting your vote.";
 
-            // Check for user rejection patterns
+            
             if (err.code === 4001 || err.message?.includes('User rejected') || err.message?.includes('User denied')) {
                 toastTitle = "Transaction Rejected";
                 toastDescription = "You rejected the transaction in your wallet.";
@@ -264,34 +262,34 @@ export default function DaoPage() {
 
             setToastMessage({ type: 'error', title: toastTitle, description: toastDescription });
         } finally {
-             // Use setTimeout to potentially avoid state update conflicts
+             
              setTimeout(() => setVotingStates(prev => ({ ...prev, [proposalId]: false })), 0);
         }
     };
 
-    // Placeholder - Actual claim rent logic might belong elsewhere or need more context
+    
     const handleClaimRent = () => {
          if (!isConnected || !account) {
             setToastMessage({ type: 'error', title: "Connect Wallet", description: "Please connect your wallet to claim rent." });
             return;
         }
         console.log("Claim Rent button clicked - Implement actual logic");
-        // TODO: Implement interaction with RentDistribution contract
-        // Needs to know WHICH property token address to claim for.
-        // This might involve fetching user's owned tokens and their claimable amounts separately.
+        
+        
+        
         setToastMessage({ type: 'info', title: "Claim Rent (Not Implemented)", description: "Rent claiming functionality needs implementation." });
     };
 
-    // Placeholder - Needs implementation (modal or new page)
+    
     const handleCreateProposalClick = () => {
         if (!isConnected || !account) {
             setToastMessage({ type: 'error', title: "Connect Wallet", description: "Please connect your wallet to create a proposal." });
             return;
         }
-        setShowCreateProposalModal(true); // Open the modal
+        setShowCreateProposalModal(true); 
     };
 
-    // --- Render Logic ---
+    
 
     const renderProposalCard = ({ proposal }: { proposal: Proposal }) => {
         const votesFor = ethers.getBigInt(proposal.votesFor);
@@ -300,15 +298,15 @@ export default function DaoPage() {
         const forPercentage = totalVotes > 0 ? Number((votesFor * BigInt(100)) / totalVotes) : 0;
         const againstPercentage = totalVotes > 0 ? 100 - forPercentage : 0;
 
-        const now = Date.now() / 1000; // Current time in seconds
+        const now = Date.now() / 1000; 
         const isExpired = proposal.endTime < now;
         const isActive = proposal.state === 'Active' && !isExpired;
         
-        // Format votes for display (using ethers utils)
+        
         const formattedVotesFor = parseFloat(ethers.formatUnits(votesFor, 18)).toLocaleString(undefined, { maximumFractionDigits: 2 });
         const formattedVotesAgainst = parseFloat(ethers.formatUnits(votesAgainst, 18)).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
-        // Get property details from cache
+        
         const propertyDetails = proposal.propertyTokenAddress ? propertyDetailsCache[proposal.propertyTokenAddress] : null;
         const propertyImageUrl = propertyDetails?.metadata?.image ? tryConvertIpfsUrl(propertyDetails.metadata.image) : null;
         const propertyName = propertyDetails?.metadata?.name;
@@ -351,7 +349,7 @@ export default function DaoPage() {
                     <CardDescription className="text-xs text-gray-400 pt-1">
                         Proposed by: 
                         <a 
-                          href={`https://basescan.org/address/${proposal.proposer}`} // Assuming Base Sepolia explorer
+                          href={`https://${process.env.NEXT_PUBLIC_APP_URL}/address/${proposal.proposer}`}
                           target="_blank" 
                           rel="noopener noreferrer" 
                           className="text-blue-400 hover:underline ml-1"
@@ -365,19 +363,12 @@ export default function DaoPage() {
                     </CardDescription>
               </CardHeader>
                 <CardContent className="flex-grow space-y-4">
-                    {/* Optional: Display target contract/function if needed */}
-                    {/* <div className="text-xs text-gray-500 break-all">
-                        <p>Target: {proposal.targetContract}</p>
-                        <p>Call Data: {proposal.functionCall.substring(0, 30)}...</p>
-                    </div> */}
 
-                    {/* Vote Progress */}
                     <div className="space-y-2">
                         <div className="flex justify-between text-sm font-medium">
                            <span className='text-green-400'>For: {formattedVotesFor} ({forPercentage.toFixed(1)}%)</span>
                            <span className='text-red-400'>Against: {formattedVotesAgainst} ({againstPercentage.toFixed(1)}%)</span>
                         </div>
-                        {/* Replace single Progress component with two divs */}
                         <div className="flex w-full h-2 bg-gray-700 rounded-full overflow-hidden">
                            <div 
                              className="bg-green-500 transition-all duration-300 ease-in-out"
@@ -390,11 +381,6 @@ export default function DaoPage() {
                              title={`Against: ${againstPercentage.toFixed(1)}%`}
                            ></div>
                         </div>
-                        {/* 
-                        <div className="w-full bg-gray-700 rounded-full h-2.5 overflow-hidden">
-                            <Progress value={forPercentage} className="h-2.5" />
-                        </div> 
-                        */}
                     </div>
               </CardContent>
                 <CardFooter className="flex justify-end gap-3">
@@ -441,7 +427,6 @@ export default function DaoPage() {
                         <p className="text-gray-400">Review and vote on proposals for the Property DAO.</p>
           </div>
                     <div className="flex flex-col sm:flex-row gap-4">
-                        {/* Create Proposal Button */}
                         <Button 
                             onClick={handleCreateProposalClick} 
                             className="crypto-btn"
@@ -477,9 +462,7 @@ export default function DaoPage() {
       </main>
       <Footer />
 
-            {/* Create Proposal Modal */}
             <Dialog open={showCreateProposalModal} onOpenChange={setShowCreateProposalModal}>
-                {/* Apply EXACT className from marketplace modal */}
                 <DialogContent className="sm:max-w-[700px] bg-gradient-to-br from-gray-900 to-gray-950 border-blue-900/50 rounded-xl backdrop-blur-lg shadow-xl">
                     <DialogHeader>
                         <DialogTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">Create New Proposal</DialogTitle>

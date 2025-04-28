@@ -90,7 +90,7 @@ const TokenPropertyDetailPage = () => {
         console.log("Property data from API (token lookup):", data);
         
         // Ensure propertyDetails exists (create it if not present)
-        if (!data.propertyDetails) {
+        if (!data?.propertyDetails) {
           data.propertyDetails = {
             physicalAddress: 'Address not available',
             sqft: 0,
@@ -106,7 +106,7 @@ const TokenPropertyDetailPage = () => {
 
         // Convert IPFS image URL to HTTP URL for display
         try {
-          if (data.metadata?.image) {
+          if (data?.metadata?.image) {
             const httpUrl = tryConvertIpfsUrl(data.metadata.image);
             setImageUrl(httpUrl);
           }

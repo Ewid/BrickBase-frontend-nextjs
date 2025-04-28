@@ -1,4 +1,4 @@
-'use client'; // Error boundaries must be Client Components
+'use client';
 
 import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,6 @@ export default function DaoError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log the error to an error reporting service
     console.error(`DAO Section Error (${error?.digest || 'no digest'}):`, error);
   }, [error]);
 
@@ -25,7 +24,6 @@ export default function DaoError({
         <p className="text-gray-400 mb-6">
           We encountered an issue while loading the DAO proposals or related data. Please try again or check back later.
         </p>
-         {/* Optional: Display error message in development */}
         {process.env.NODE_ENV === 'development' && (
            <p className="text-xs text-red-400 mb-4 bg-red-900/20 p-2 rounded font-mono break-words">
              Error: {error.message} {error.digest ? `(Digest: ${error.digest})` : ''}

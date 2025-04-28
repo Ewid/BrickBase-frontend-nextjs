@@ -47,7 +47,7 @@ const nextConfig = {
   },
   experimental: {
     optimizeCss: false,
-    nextScriptWorkers: true,
+    nextScriptWorkers: false,
   }
 }
 

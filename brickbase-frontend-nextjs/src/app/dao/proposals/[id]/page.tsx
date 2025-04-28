@@ -7,29 +7,29 @@ import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Loader2, AlertTriangle, ArrowLeft, Info, CheckCircle, XCircle, Clock, ThumbsUp, ThumbsDown, MinusCircle } from 'lucide-react';
-import { ProposalDto } from '@/types/dtos'; // Assuming ProposalDto covers all needed details
+import { ProposalDto } from '@/types/dtos'; 
 import { formatUnits } from 'ethers';
 import Link from 'next/link';
 import { useAccount, useWriteContract } from 'wagmi';
 import DAO_ABI from '@/abis/PropertyDAO.json';
 import { toast } from "sonner";
 
-// Define interface for toast messages (can be reused or defined locally)
+
 interface ToastMessage {
     type: 'success' | 'error' | 'info' | 'loading';
     title: string;
     description?: string;
-    id?: string; // Optional ID for loading toasts
+    id?: string; 
 }
 
-// --- Constants --- TODO: Move to config/env
+
 const DAO_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_DAO_CONTRACT_ADDRESS as `0x${string}` | undefined;
 
-// Function to determine proposal status based on contract state
+
 const getProposalStatus = (proposal: ProposalDto | null): { text: string; color: string; icon: React.ElementType } => {
     if (!proposal) return { text: 'Loading', color: 'text-gray-400', icon: Loader2 };
 
-    // Use the state field derived from the contract's getProposalState()
+    
     const state = proposal.state?.toLowerCase();
 
     switch (state) {
@@ -39,29 +39,29 @@ const getProposalStatus = (proposal: ProposalDto | null): { text: string; color:
         case 'active': return { text: 'Active', color: 'text-blue-400', icon: Clock };
         case 'pending': return { text: 'Pending', color: 'text-yellow-400', icon: Clock };
         case 'ready': return { text: 'Ready to Execute', color: 'text-purple-400', icon: CheckCircle };
-        // Add other potential states from your backend/contract if necessary
+        
         default: return { text: proposal.state || 'Unknown', color: 'text-gray-400', icon: Info };
     }
 };
 
-// --- Component --- 
+
 const ProposalDetailPage = () => {
   const params = useParams();
-  const proposalId = params.id as string; // Get ID from URL
+  const proposalId = params.id as string; 
   const { address: userAddress, isConnected } = useAccount();
   const { writeContract, data: hash, isPending, isSuccess, isError, error: writeError } = useWriteContract();
 
   const [proposal, setProposal] = useState<ProposalDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [voteLoading, setVoteLoading] = useState(false); // Keep this for button state
-  // Add state for toast messages
+  const [voteLoading, setVoteLoading] = useState(false); 
+  
   const [toastMessage, setToastMessage] = useState<ToastMessage | null>(null);
 
-  // Fetch proposal details
+  
   useEffect(() => {
     if (!proposalId) return;
-    // Ensure ABI is loaded, handle potential import error more gracefully if needed
+    
     if (!DAO_ABI) {
         console.error("DAO ABI not found. Make sure src/abis/DAOABI.json exists.");
         setError("Application configuration error: Missing ABI.");
@@ -79,8 +79,8 @@ const ProposalDetailPage = () => {
       setIsLoading(true);
       setError(null);
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
-        // Assume an endpoint like /dao/proposals/:id exists
+        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+        
         const response = await fetch(`${apiUrl}/dao/proposals/${proposalId}`);
         if (!response.ok) {
           if (response.status === 404) throw new Error('Proposal not found.');
@@ -99,8 +99,8 @@ const ProposalDetailPage = () => {
     fetchProposalDetails();
   }, [proposalId]);
 
-  // Handle voting transaction submission
-  const handleVote = async (support: 0 | 1 | 2) => { // 0: Against, 1: For, 2: Abstain
+  
+  const handleVote = async (support: 0 | 1 | 2) => { 
     if (!isConnected || !userAddress) {
         setToastMessage({ type: 'error', title: "Connect Wallet", description: "Please connect your wallet to vote." });
         return;
@@ -122,7 +122,7 @@ const ProposalDetailPage = () => {
     });
   };
 
- // UseEffect to display toast messages (including from useWriteContract)
+ 
  useEffect(() => {
     if (toastMessage) {
         switch (toastMessage.type) {
@@ -139,39 +139,39 @@ const ProposalDetailPage = () => {
                 toast.loading(toastMessage.title, { id: toastMessage.id, description: toastMessage.description });
                 break;
         }
-        // Don't reset immediately if it's a loading toast that will be updated
+        
         if (toastMessage.type !== 'loading') {
             setToastMessage(null); 
         }
     }
 }, [toastMessage]);
 
- // useEffect to handle useWriteContract status and set toast state
+ 
  useEffect(() => {
     if (isPending) {
-        setVoteLoading(true); // Keep for button state
+        setVoteLoading(true); 
         setToastMessage({ type: 'loading', title: "Submitting your vote...", id: 'vote-toast' });
     }
      if (isSuccess) {
-        setTimeout(() => setVoteLoading(false), 0); // Defer state update
+        setTimeout(() => setVoteLoading(false), 0); 
         setToastMessage({ 
             type: 'success', 
             title: "Vote submitted successfully!", 
             id: 'vote-toast', 
             description: `Transaction: ${hash?.substring(0,10)}...` 
         });
-        // TODO: Optionally re-fetch proposal data or update UI optimistically
+        
     }
     if (isError) {
-        setTimeout(() => setVoteLoading(false), 0); // Defer state update
-        console.error("Voting Error:", writeError); // Keep console.error for debugging hook errors
+        setTimeout(() => setVoteLoading(false), 0); 
+        console.error("Voting Error:", writeError); 
         
         let toastTitle = "Vote failed";
         let toastDescription = writeError?.message || 'An unknown error occurred.';
         
-        // Check for user rejection patterns in writeError
-        // @ts-ignore - Accessing internal properties for error code check
-        if (writeError?.cause?.code === 4001 || writeError?.message?.includes('User rejected') || writeError?.message?.includes('User denied')) {
+        
+        
+        if (writeError?.message?.includes('User rejected') || writeError?.message?.includes('User denied')) {
              toastTitle = "Transaction Rejected";
              toastDescription = "You rejected the transaction in your wallet.";
         }
@@ -185,7 +185,7 @@ const ProposalDetailPage = () => {
     }
   }, [isPending, isSuccess, isError, hash, writeError]);
 
-  // --- Render Logic --- 
+  
   const renderContent = () => {
     if (isLoading) {
       return (
@@ -205,7 +205,7 @@ const ProposalDetailPage = () => {
     }
 
     if (!proposal) {
-        // This case should ideally be covered by the error state if fetch fails
+        
       return <div className="text-center py-20 text-gray-400">Proposal data unavailable.</div>;
     }
 
@@ -216,14 +216,12 @@ const ProposalDetailPage = () => {
          <Card className="glass-card border-0 overflow-hidden w-full max-w-3xl mx-auto">
               <CardHeader className="border-b border-gray-700/50 pb-4">
                 <div className="flex justify-between items-start gap-4 mb-2">
-                    {/* Use CardTitle as a component */}
                     <h2 className="text-2xl font-semibold leading-none tracking-tight text-white">Proposal #{proposal.id}</h2>
                     <span className={`flex items-center text-sm font-medium px-3 py-1 rounded-full ${status.color} bg-gray-800/60 whitespace-nowrap`}>
                         <StatusIcon className="h-4 w-4 mr-1.5" />
                         {status.text}
                     </span>
                 </div>
-                 {/* Use CardDescription as a component */}
                 <p className="text-sm text-muted-foreground text-gray-300 pt-1">
                     Proposed by: <span className="font-mono text-xs bg-gray-800/50 px-1.5 py-0.5 rounded">{proposal.proposer}</span>
                 </p>
@@ -235,18 +233,14 @@ const ProposalDetailPage = () => {
                 <h4 className="font-semibold text-white mt-4 mb-2">Details</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
                     <p>Target Contract: <span className="font-mono text-xs bg-gray-800/50 px-1.5 py-0.5 rounded">{proposal.targetContract || 'N/A'}</span></p>
-                     {/* TODO: Add more details like start/end blocks, eta, etc. if available in DTO */}
                      <p>Function Call Data: </p>
-                     {/* Use proposal.functionCall - consistent with contract struct */}
                      <pre className="font-mono text-xs bg-gray-800/50 p-2 rounded mt-1 overflow-x-auto whitespace-pre-wrap break-all col-span-full">{proposal.functionCall || '0x'}</pre>
                 </div>
 
                  <h4 className="font-semibold text-white mt-4 mb-2">Current Votes</h4>
                  <div className="flex space-x-6 text-sm">
-                     {/* Use votesFor and votesAgainst - consistent with contract struct */}
                      <span><ThumbsUp className="inline h-4 w-4 mr-1 text-green-400"/> For: {formatUnits(proposal.votesFor || '0', 0)}</span>
                      <span><ThumbsDown className="inline h-4 w-4 mr-1 text-red-400"/> Against: {formatUnits(proposal.votesAgainst || '0', 0)}</span>
-                     {/* Abstain votes are not in the provided contract struct */}
                 </div>
               </CardContent>
               <CardFooter className="bg-gray-800/30 px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -254,11 +248,10 @@ const ProposalDetailPage = () => {
                      {isConnected ? `Connected as: ${userAddress?.substring(0, 6)}...${userAddress?.substring(userAddress.length - 4)}` : "Connect wallet to vote"}
                  </p>
                 <div className="flex gap-3">
-                     {/* TODO: Check if user has already voted or if voting period is active */}
                      <Button 
                         variant="outline" 
                         className="border-red-500/50 text-red-400 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
-                        onClick={() => handleVote(0)} // 0 = Against
+                        onClick={() => handleVote(0)} 
                         disabled={voteLoading || !isConnected || !proposal}
                     > 
                          {voteLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ThumbsDown className="mr-2 h-4 w-4"/>}
@@ -267,14 +260,12 @@ const ProposalDetailPage = () => {
                      <Button 
                         variant="outline" 
                         className="border-green-500/50 text-green-400 hover:bg-green-500/10 hover:text-green-300 disabled:opacity-50"
-                        onClick={() => handleVote(1)} // 1 = For
+                        onClick={() => handleVote(1)} 
                         disabled={voteLoading || !isConnected || !proposal}
                     >
                          {voteLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ThumbsUp className="mr-2 h-4 w-4"/>}
                          Vote For
                     </Button>
-                     {/* Optional: Abstain Button */}
-                     {/* <Button variant="outline" className="border-gray-500/50 text-gray-400 hover:bg-gray-500/10 hover:text-gray-300">Vote Abstain</Button> */}
                 </div>
               </CardFooter>
             </Card>

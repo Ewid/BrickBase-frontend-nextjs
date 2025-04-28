@@ -914,19 +914,6 @@ export default function MarketplacePage() {
           </div>
           
           <div className="flex items-center gap-3">
-            {/* Remove the Refresh button */}
-            {/* 
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={handleRefresh}
-              className="h-10"
-            >
-              <RefreshCcw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button> 
-            */}
-            
             <Button 
               onClick={handleCreateListingClick}
               className="h-10 crypto-btn"

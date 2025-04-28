@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import ClaimRentForm from '@/components/ClaimRentForm';
 
-// Interface for enhanced property DTO including balance/rent details
+
 interface PortfolioProperty extends PropertyDto {
     formattedBalance: string;
     ownershipPercentage: number;
@@ -34,19 +34,19 @@ interface PortfolioProperty extends PropertyDto {
     isClaimingRent: boolean;
 }
 
-// Interface for properties specifically passed to ClaimRentForm
+
 interface ClaimablePropertyForForm extends PortfolioProperty {
-    // No additional fields needed if PortfolioProperty already includes formatted string and tokenAddress
+    
 }
 
-// Define interface for toast messages (can be reused or defined locally)
+
 interface ToastMessage {
     type: 'success' | 'error' | 'info';
     title: string;
     description?: string;
 }
 
-// Helper function
+
 function shortenAddress(address: string): string {
   if (!address || !address.startsWith('0x')) return 'Unknown';
   return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
@@ -59,7 +59,7 @@ export default function PortfolioPage() {
     const [error, setError] = useState<string | null>(null);
     const [claimingStates, setClaimingStates] = useState<Record<string, boolean>>({});
     const [showClaimRentModal, setShowClaimRentModal] = useState(false);
-    // Add state for toast messages
+    
     const [toastMessage, setToastMessage] = useState<ToastMessage | null>(null);
 
     const fetchPortfolio = async () => {
@@ -74,10 +74,10 @@ export default function PortfolioPage() {
         const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
 
         try {
-            // 1. Fetch owned properties
+            
             const ownedResponse = await fetch(`${apiUrl}/properties/owned/${account}`, {
                 signal: AbortSignal.timeout(30000),
-                next: { revalidate: 120 } // Cache for 2 minutes
+                next: { revalidate: 120 } 
             });
             if (!ownedResponse.ok) {
                 throw new Error(`Failed to fetch owned properties: ${ownedResponse.statusText}`);
@@ -87,10 +87,10 @@ export default function PortfolioPage() {
             if (!ownedProperties || ownedProperties.length === 0) {
                 setPortfolio([]);
                 setIsLoading(false);
-                return; // No properties owned
+                return; 
             }
 
-            // 2. Fetch balance, percentage, and claimable rent for each
+            
             const enrichedPortfolioPromises = ownedProperties.map(async (prop) => {
                 const tokenAddr = prop.tokenAddress || prop.propertyDetails?.associatedPropertyToken;
                 if (!tokenAddr || !ethers.isAddress(tokenAddr)) {
@@ -102,13 +102,13 @@ export default function PortfolioPage() {
                     const balanceWei = await getTokenBalance(tokenAddr, account);
                     const formattedBalance = formatCurrency(balanceWei, 18);
 
-                    // Calculate ownership percentage (totalSupply should be in PropertyDto)
+                    
                     const totalSupply = ethers.getBigInt(prop.totalSupply || '0');
                     const balance = ethers.getBigInt(balanceWei);
                     const ownershipPercentage = totalSupply > BigInt(0) ?
                         parseFloat(((balance * BigInt(10000)) / totalSupply).toString()) / 100 : 0;
 
-                    // Fetch claimable rent
+                    
                     let claimableRentAmount: string = '0';
                     let claimableRentFormatted: string = '$0.00';
                     try {
@@ -122,7 +122,7 @@ export default function PortfolioPage() {
                         console.warn(`Could not fetch claimable rent for ${tokenAddr}:`, rentError);
                     }
 
-                    // Ensure metadata exists
+                    
                     const metadata = prop.metadata || { name: 'Unnamed Property', description: '', image: '', attributes: [] };
 
                     const enrichedProperty: PortfolioProperty = {
@@ -160,14 +160,14 @@ export default function PortfolioPage() {
         if (isConnected && account) {
             fetchPortfolio();
         } else {
-            // Clear portfolio if disconnected or no account
+            
             setPortfolio([]);
             setIsLoading(false);
             setError(null);
         }
     }, [account, isConnected]);
 
-    // UseEffect to display toast messages
+    
     useEffect(() => {
         if (toastMessage) {
             switch (toastMessage.type) {
@@ -181,64 +181,64 @@ export default function PortfolioPage() {
                     toast.info(toastMessage.title, { description: toastMessage.description });
                     break;
             }
-            setToastMessage(null); // Reset after showing
+            setToastMessage(null); 
         }
     }, [toastMessage]);
 
-    // Handle claiming rent for a single property
-    const handleClaimRent = async (tokenAddress: string): Promise<void> => { // Return void, we handle errors internally
+    
+    const handleClaimRent = async (tokenAddress: string): Promise<void> => { 
         if (!tokenAddress || claimingStates[tokenAddress]) return;
 
         setClaimingStates(prev => ({ ...prev, [tokenAddress]: true }));
-        let claimSuccessful = false; // Flag to track success
+        let claimSuccessful = false; 
 
         try {
-             // --- Inner try...catch specifically for the claimRent call ---
+             
             try {
                 const result = await claimRent(tokenAddress);
                 if (result.success) {
                     setToastMessage({ type: 'success', title: "Rent Claimed!", description: `Rent for ${shortenAddress(tokenAddress)} claimed successfully.` });
                     claimSuccessful = true;
-                    // Refresh portfolio data AFTER success and state update
+                    
                 } else {
-                    // Handle failure reported by the service function itself
+                    
                     throw result.error || new Error("Failed to claim rent.");
                 }
             } catch (claimErr: any) {
-                 // --- Catch errors ONLY from claimRent service call ---
+                 
                 let errorMessage = claimErr.reason || claimErr.message || "Could not claim rent.";
                 let errorTitle = "Claim Failed";
                 
                 if (errorMessage.includes("No new rent to claim")) {
                     errorMessage = "There is currently no rent available to claim for this property.";
-                // Check for user rejection patterns
+                
                 } else if (claimErr.code === 4001 || claimErr.message?.includes('User rejected') || claimErr.message?.includes('User denied')) {
                     errorTitle = "Transaction Rejected";
                     errorMessage = "You rejected the transaction in your wallet.";
                 }
-                // Set toast state for the caught error
+                
                 setToastMessage({ type: 'error', title: errorTitle, description: errorMessage });
-                // DO NOT re-throw here - prevents overlay
+                
             }
-            // --- End of inner try...catch ---
+            
 
-            // Refresh portfolio only if claim was successful
+            
             if (claimSuccessful) {
                  await fetchPortfolio();
             }
 
         } catch (outerErr: any) {
-             // This outer catch handles unexpected errors outside the claimRent call itself
-             // (e.g., issues with setClaimingStates, fetchPortfolio)
+             
+             
              console.error("Unexpected error during claim process:", outerErr);
               setToastMessage({ type: 'error', title: "Error", description: "An unexpected error occurred." });
         } finally {
-             // Use setTimeout to potentially avoid state update conflicts
+             
              setTimeout(() => setClaimingStates(prev => ({ ...prev, [tokenAddress]: false })), 0);
         }
     };
 
-    // --- Render Logic ---
+    
     const renderPortfolio = () => {
         if (!isConnected) {
             return (
@@ -282,7 +282,7 @@ export default function PortfolioPage() {
             );
         }
 
-        // Display owned properties
+        
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {portfolio.map((prop) => {
@@ -335,9 +335,9 @@ export default function PortfolioPage() {
                                         className="w-full crypto-btn"
                                         onClick={() => {
                                             handleClaimRent(tokenAddress).catch(err => {
-                                                // Catch is needed to prevent overlay, but error is handled inside handleClaimRent.
-                                                // No action needed here.
-                                                // console.log("Caught rent claim rejection at onClick, toast already shown:", err.message);
+                                                
+                                                
+                                                
                                             });
                                         }}
                                         disabled={isClaiming}

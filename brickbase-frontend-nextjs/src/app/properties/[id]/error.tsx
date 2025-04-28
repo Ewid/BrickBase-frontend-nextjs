@@ -1,4 +1,4 @@
-'use client'; // Error boundaries must be Client Components
+'use client'; 
 
 import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ export default function PropertyError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log the error to an error reporting service
+    
     console.error(`Property Detail Error (${error?.digest || 'no digest'}):`, error);
   }, [error]);
 
