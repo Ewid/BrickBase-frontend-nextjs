@@ -5,7 +5,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardContent, CardFooter, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, AlertCircle, Landmark, Wallet, Layers, Percent } from 'lucide-react';
+import { Loader2, AlertCircle, Landmark, Wallet, Layers, Percent, PlusCircle } from 'lucide-react';
 import { useAccount } from '@/hooks/useAccount';
 import { ethers } from 'ethers';
 import { PropertyDto, RentDto } from '@/types/dtos';
@@ -14,13 +14,29 @@ import { getClaimableRent, claimRent } from '@/services/property';
 import { toast } from '@/components/ui/use-toast';
 import Image from 'next/image';
 import Link from 'next/link';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
+import ClaimRentForm from '@/components/ClaimRentForm';
 
 // Interface for enhanced property DTO including balance/rent details
 interface PortfolioProperty extends PropertyDto {
     formattedBalance: string;
     ownershipPercentage: number;
-    claimableRentFormatted: string | undefined;
+    claimableRentAmount: string;
+    claimableRentFormatted: string;
+    tokenAddress: string;
     isClaimingRent: boolean;
+}
+
+// Interface for properties specifically passed to ClaimRentForm
+interface ClaimablePropertyForForm extends PortfolioProperty {
+    // No additional fields needed if PortfolioProperty already includes formatted string and tokenAddress
 }
 
 // Helper function
@@ -34,7 +50,8 @@ export default function PortfolioPage() {
     const [portfolio, setPortfolio] = useState<PortfolioProperty[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [claimingStates, setClaimingStates] = useState<Record<string, boolean>>({}); // Track claiming status per token address
+    const [claimingStates, setClaimingStates] = useState<Record<string, boolean>>({});
+    const [showClaimRentModal, setShowClaimRentModal] = useState(false);
 
     const fetchPortfolio = async () => {
         if (!account) {
@@ -66,41 +83,53 @@ export default function PortfolioPage() {
 
             // 2. Fetch balance, percentage, and claimable rent for each
             const enrichedPortfolioPromises = ownedProperties.map(async (prop) => {
-                const tokenAddress = prop.tokenAddress || prop.propertyDetails?.associatedPropertyToken;
-                if (!tokenAddress) return null;
+                const tokenAddr = prop.tokenAddress || prop.propertyDetails?.associatedPropertyToken;
+                if (!tokenAddr || !ethers.isAddress(tokenAddr)) {
+                    console.warn(`Skipping property ${prop.id || 'N/A'} due to missing or invalid token address.`);
+                    return null;
+                }
 
                 try {
-                    const balanceWei = await getTokenBalance(tokenAddress, account);
+                    const balanceWei = await getTokenBalance(tokenAddr, account);
                     const formattedBalance = formatCurrency(balanceWei, 18);
 
                     // Calculate ownership percentage (totalSupply should be in PropertyDto)
                     const totalSupply = ethers.getBigInt(prop.totalSupply || '0');
                     const balance = ethers.getBigInt(balanceWei);
-                    const ownershipPercentage = totalSupply > BigInt(0) ? 
+                    const ownershipPercentage = totalSupply > BigInt(0) ?
                         parseFloat(((balance * BigInt(10000)) / totalSupply).toString()) / 100 : 0;
 
                     // Fetch claimable rent
-                    let claimableRentFormatted: string | undefined = undefined;
+                    let claimableRentAmount: string = '0';
+                    let claimableRentFormatted: string = '$0.00';
                     try {
-                        const rentData: RentDto = await getClaimableRent(account, tokenAddress);
-                        if (ethers.getBigInt(rentData.claimableAmount) > 0) {
-                            claimableRentFormatted = formatCurrency(rentData.claimableAmount, 6);
+                        const rentData: RentDto = await getClaimableRent(account, tokenAddr);
+                        const rentAmountBigInt = ethers.getBigInt(rentData.claimableAmount || '0');
+                        if (rentAmountBigInt > 0) {
+                            claimableRentAmount = rentData.claimableAmount;
+                            claimableRentFormatted = `$${formatCurrency(rentData.claimableAmount, 6)}`;
                         }
                     } catch (rentError) {
-                        console.warn(`Could not fetch claimable rent for ${tokenAddress}:`, rentError);
+                        console.warn(`Could not fetch claimable rent for ${tokenAddr}:`, rentError);
                     }
+
+                    // Ensure metadata exists
+                    const metadata = prop.metadata || { name: 'Unnamed Property', description: '', image: '', attributes: [] };
 
                     const enrichedProperty: PortfolioProperty = {
                         ...prop,
+                        metadata: metadata,
                         formattedBalance,
                         ownershipPercentage,
+                        claimableRentAmount,
                         claimableRentFormatted,
+                        tokenAddress: tokenAddr,
                         isClaimingRent: false
                     };
 
                     return enrichedProperty;
                 } catch (propError) {
-                    console.error(`Failed to enrich property ${prop.id} (${tokenAddress}):`, propError);
+                    console.error(`Failed to enrich property ${prop.id} (${tokenAddr}):`, propError);
                     return null;
                 }
             });
@@ -139,7 +168,7 @@ export default function PortfolioPage() {
             if (result.success) {
                 toast({ title: "Rent Claimed!", description: `Rent for ${shortenAddress(tokenAddress)} claimed successfully.` });
                 // Refresh portfolio data to show updated claimable amounts
-                fetchPortfolio();
+                await fetchPortfolio();
             } else {
                 throw result.error || new Error("Failed to claim rent.");
             }
@@ -150,17 +179,10 @@ export default function PortfolioPage() {
                 description: err.reason || err.message || "Could not claim rent.",
                 variant: "destructive"
             });
+            throw err; // Re-throw for ClaimRentForm to catch
         } finally {
             setClaimingStates(prev => ({ ...prev, [tokenAddress]: false }));
         }
-    };
-
-    // Placeholder for claiming all rent
-    const handleClaimAllRent = async () => {
-        console.log("Claim All Rent clicked - Implement batch logic if possible, or sequential claims.");
-        toast({ title: "Claim All (Not Implemented)", description: "Claiming rent for all properties needs implementation.", variant: "default" });
-        // TODO: Iterate through portfolio, check claimableRentFormatted, call handleClaimRent for each
-        // Consider potential issues with multiple simultaneous transactions.
     };
 
     // --- Render Logic ---
@@ -211,13 +233,13 @@ export default function PortfolioPage() {
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {portfolio.map((prop) => {
-                    const tokenAddress = prop.tokenAddress || prop.propertyDetails?.associatedPropertyToken;
+                    const tokenAddress = prop.tokenAddress;
                     const imageUrl = prop.metadata?.image ? tryConvertIpfsUrl(prop.metadata.image) : '/property-placeholder.jpg';
-                    const isClaiming = tokenAddress ? claimingStates[tokenAddress] : false;
-                    const canClaim = !!prop.claimableRentFormatted; // True if there is a formatted claimable amount
+                    const isClaiming = claimingStates[tokenAddress] || false;
+                    const canClaim = ethers.getBigInt(prop.claimableRentAmount || '0') > 0;
 
                     return (
-                        <Card key={tokenAddress || prop.id} className="glass-card bg-gray-900/70 border border-white/10 overflow-hidden flex flex-col">
+                        <Card key={tokenAddress} className="glass-card bg-gray-900/70 border border-white/10 overflow-hidden flex flex-col">
                             <CardHeader className="p-0">
                                 <div className="relative aspect-video w-full">
                                     <Image
@@ -226,13 +248,14 @@ export default function PortfolioPage() {
                                         fill
                                         className="object-cover"
                                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                        loading="lazy"
                                     />
                                 </div>
                             </CardHeader>
                             <CardContent className="p-4 flex-grow flex flex-col justify-between">
                                 <div>
                                     <CardTitle className="text-lg text-white mb-2 line-clamp-1" title={prop.metadata?.name}>{prop.metadata?.name || 'Unnamed Property'}</CardTitle>
-                                    <CardDescription className="text-xs text-gray-400 mb-4">Token: {tokenAddress ? shortenAddress(tokenAddress) : 'N/A'}</CardDescription>
+                                    <CardDescription className="text-xs text-gray-400 mb-4">Token: {shortenAddress(tokenAddress)}</CardDescription>
 
                                     {/* Balance and Ownership */}
                                     <div className="space-y-2 text-sm mb-4">
@@ -247,18 +270,18 @@ export default function PortfolioPage() {
                                     </div>
                                 </div>
 
-                                {/* Claimable Rent */}
+                                {/* Claimable Rent & Claim Button */}
                                 <div className="mt-auto pt-4 border-t border-white/10">
                                     <div className="flex justify-between items-center mb-3">
                                         <span className="text-gray-400 text-sm">Claimable Rent:</span>
-                                        <span className={`font-medium text-lg ${prop.claimableRentFormatted ? 'text-green-400' : 'text-gray-500'}`}>
-                                            ${prop.claimableRentFormatted || '0.00'}
+                                        <span className={`font-medium text-lg ${canClaim ? 'text-green-400' : 'text-gray-500'}`}>
+                                            {prop.claimableRentFormatted}
                                         </span>
                                     </div>
                                     <Button
                                         className="w-full crypto-btn"
-                                        onClick={() => tokenAddress && handleClaimRent(tokenAddress)}
-                                        disabled={!tokenAddress || !canClaim || isClaiming}
+                                        onClick={() => handleClaimRent(tokenAddress)}
+                                        disabled={isClaiming}
                                     >
                                         {isClaiming ? (
                                             <Loader2 className="h-4 w-4 mr-2 animate-spin"/>
@@ -286,18 +309,36 @@ export default function PortfolioPage() {
                         <p className="text-gray-400">Overview of your property token holdings and claimable rent.</p>
                     </div>
                      <Button
-                        onClick={handleClaimAllRent}
+                        onClick={() => setShowClaimRentModal(true)}
                         className="crypto-btn"
-                        disabled={portfolio.length === 0 || !portfolio.some(p => p.claimableRentFormatted)}
-                    >
+                        disabled={!isConnected}
+                     >
                          <Landmark className="h-4 w-4 mr-2" />
-                         Claim All Rent (Placeholder)
+                         Claim Available Rent
                     </Button>
                 </div>
 
                 {renderPortfolio()}
             </main>
             <Footer />
+
+            <Dialog open={showClaimRentModal} onOpenChange={setShowClaimRentModal}>
+                <DialogContent className="sm:max-w-[600px] bg-gradient-to-br from-gray-900 to-gray-950 border-blue-900/50 rounded-xl backdrop-blur-lg shadow-xl">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">Claim Property Rent</DialogTitle>
+                        <DialogDescription className="text-gray-300 pt-1">
+                            Select a property below to claim your available USDC rent payout.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-2">
+                        <ClaimRentForm
+                            portfolioProperties={portfolio}
+                            onClose={() => setShowClaimRentModal(false)}
+                            handleClaimRent={handleClaimRent}
+                        />
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 } 
