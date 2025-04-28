@@ -189,16 +189,6 @@ const PropertiesPage = () => {
             <h1 className="text-3xl font-bold mb-2">Explore <span className="text-gradient">Properties</span></h1>
             <p className="text-gray-400">Find your next digital real estate investment</p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Button variant="outline" className="border-crypto-light/30 text-crypto-light">
-              <Filter className="mr-2 h-4 w-4" />
-              Filter
-            </Button>
-            <Button variant="outline" className="border-crypto-light/30 text-crypto-light">
-              <ArrowDownAZ className="mr-2 h-4 w-4" />
-              Sort By
-            </Button>
-          </div>
         </div>
 
         {renderContent()}
