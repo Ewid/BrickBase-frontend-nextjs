@@ -374,13 +374,27 @@ export default function DaoPage() {
                     {/* Vote Progress */}
                     <div className="space-y-2">
                         <div className="flex justify-between text-sm font-medium">
-                           <span className='text-green-400'>For: {formattedVotesFor}</span>
-                           <span className='text-red-400'>Against: {formattedVotesAgainst}</span>
+                           <span className='text-green-400'>For: {formattedVotesFor} ({forPercentage.toFixed(1)}%)</span>
+                           <span className='text-red-400'>Against: {formattedVotesAgainst} ({againstPercentage.toFixed(1)}%)</span>
                         </div>
-                        {/* Basic Progress Bar - Styles updated in progress.tsx */}
+                        {/* Replace single Progress component with two divs */}
+                        <div className="flex w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                           <div 
+                             className="bg-green-500 transition-all duration-300 ease-in-out"
+                             style={{ width: `${forPercentage}%` }}
+                             title={`For: ${forPercentage.toFixed(1)}%`}
+                           ></div>
+                           <div 
+                             className="bg-red-500 transition-all duration-300 ease-in-out"
+                             style={{ width: `${againstPercentage}%` }}
+                             title={`Against: ${againstPercentage.toFixed(1)}%`}
+                           ></div>
+                        </div>
+                        {/* 
                         <div className="w-full bg-gray-700 rounded-full h-2.5 overflow-hidden">
                             <Progress value={forPercentage} className="h-2.5" />
-                        </div>
+                        </div> 
+                        */}
                     </div>
               </CardContent>
                 <CardFooter className="flex justify-end gap-3">
