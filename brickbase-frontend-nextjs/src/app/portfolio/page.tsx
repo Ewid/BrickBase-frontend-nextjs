@@ -335,7 +335,9 @@ export default function PortfolioPage() {
                                         className="w-full crypto-btn"
                                         onClick={() => {
                                             handleClaimRent(tokenAddress).catch(err => {
-                                                console.log("Caught rent claim rejection at onClick, toast already shown:", err.message);
+                                                // Catch is needed to prevent overlay, but error is handled inside handleClaimRent.
+                                                // No action needed here.
+                                                // console.log("Caught rent claim rejection at onClick, toast already shown:", err.message);
                                             });
                                         }}
                                         disabled={isClaiming}

@@ -153,7 +153,7 @@ const ProposalDetailPage = () => {
         setToastMessage({ type: 'loading', title: "Submitting your vote...", id: 'vote-toast' });
     }
      if (isSuccess) {
-        setVoteLoading(false);
+        setTimeout(() => setVoteLoading(false), 0); // Defer state update
         setToastMessage({ 
             type: 'success', 
             title: "Vote submitted successfully!", 
@@ -163,7 +163,7 @@ const ProposalDetailPage = () => {
         // TODO: Optionally re-fetch proposal data or update UI optimistically
     }
     if (isError) {
-        setVoteLoading(false);
+        setTimeout(() => setVoteLoading(false), 0); // Defer state update
         console.error("Voting Error:", writeError); // Keep console.error for debugging hook errors
         
         let toastTitle = "Vote failed";

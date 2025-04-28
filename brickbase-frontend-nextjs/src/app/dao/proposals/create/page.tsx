@@ -131,7 +131,7 @@ const CreateProposalPage = () => {
             setToastMessage({ type: 'loading', title: "Submitting proposal transaction...", id: 'propose-toast' });
         }
         if (isSuccess) {
-            setIsSubmittingForm(false);
+            setTimeout(() => setIsSubmittingForm(false), 0); // Defer state update
             setToastMessage({ 
                 type: 'success', 
                 title: "Proposal submitted successfully!", 
@@ -142,17 +142,28 @@ const CreateProposalPage = () => {
             setTimeout(() => router.push('/dao'), 2000);
         }
         if (isError) {
-            setIsSubmittingForm(false);
-            console.error("Proposal Error:", writeError); // Keep console log for hook errors
-
+            setTimeout(() => setIsSubmittingForm(false), 0); // Defer state update
+            
             let toastTitle = "Proposal failed";
             let toastDescription = writeError?.message || 'An unknown error occurred.';
+            let isHandledError = false; // Flag for handled errors
 
-            // Check for user rejection patterns in writeError
+            // Check for user rejection patterns
             // @ts-ignore - Accessing internal properties for error code check
             if (writeError?.cause?.code === 4001 || writeError?.message?.includes('User rejected') || writeError?.message?.includes('User denied')) {
                  toastTitle = "Transaction Rejected";
                  toastDescription = "You rejected the transaction in your wallet.";
+                 isHandledError = true;
+            // Check for insufficient tokens
+            } else if (writeError?.message?.includes('You Must Own At Least 5% of a property to create a proposal')) {
+                toastTitle = "Insufficient Tokens";
+                toastDescription = "You do not hold enough governance tokens to create a proposal.";
+                isHandledError = true;
+            }
+
+            // Only log unexpected errors to console
+            if (!isHandledError) {
+                console.error("Proposal Error:", writeError); 
             }
 
             setToastMessage({ 
