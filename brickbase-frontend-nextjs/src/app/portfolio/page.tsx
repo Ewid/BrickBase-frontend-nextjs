@@ -11,7 +11,7 @@ import { ethers } from 'ethers';
 import { PropertyDto, RentDto } from '@/types/dtos';
 import { getTokenBalance, formatCurrency, tryConvertIpfsUrl } from '@/services/marketplace';
 import { getClaimableRent, claimRent } from '@/services/property';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -39,6 +39,13 @@ interface ClaimablePropertyForForm extends PortfolioProperty {
     // No additional fields needed if PortfolioProperty already includes formatted string and tokenAddress
 }
 
+// Define interface for toast messages (can be reused or defined locally)
+interface ToastMessage {
+    type: 'success' | 'error' | 'info';
+    title: string;
+    description?: string;
+}
+
 // Helper function
 function shortenAddress(address: string): string {
   if (!address || !address.startsWith('0x')) return 'Unknown';
@@ -52,6 +59,8 @@ export default function PortfolioPage() {
     const [error, setError] = useState<string | null>(null);
     const [claimingStates, setClaimingStates] = useState<Record<string, boolean>>({});
     const [showClaimRentModal, setShowClaimRentModal] = useState(false);
+    // Add state for toast messages
+    const [toastMessage, setToastMessage] = useState<ToastMessage | null>(null);
 
     const fetchPortfolio = async () => {
         if (!account) {
@@ -158,30 +167,74 @@ export default function PortfolioPage() {
         }
     }, [account, isConnected]);
 
+    // UseEffect to display toast messages
+    useEffect(() => {
+        if (toastMessage) {
+            switch (toastMessage.type) {
+                case 'success':
+                    toast.success(toastMessage.title, { description: toastMessage.description });
+                    break;
+                case 'error':
+                    toast.error(toastMessage.title, { description: toastMessage.description });
+                    break;
+                case 'info':
+                    toast.info(toastMessage.title, { description: toastMessage.description });
+                    break;
+            }
+            setToastMessage(null); // Reset after showing
+        }
+    }, [toastMessage]);
+
     // Handle claiming rent for a single property
-    const handleClaimRent = async (tokenAddress: string) => {
+    const handleClaimRent = async (tokenAddress: string): Promise<void> => { // Return void, we handle errors internally
         if (!tokenAddress || claimingStates[tokenAddress]) return;
 
         setClaimingStates(prev => ({ ...prev, [tokenAddress]: true }));
+        let claimSuccessful = false; // Flag to track success
+
         try {
-            const result = await claimRent(tokenAddress);
-            if (result.success) {
-                toast({ title: "Rent Claimed!", description: `Rent for ${shortenAddress(tokenAddress)} claimed successfully.` });
-                // Refresh portfolio data to show updated claimable amounts
-                await fetchPortfolio();
-            } else {
-                throw result.error || new Error("Failed to claim rent.");
+             // --- Inner try...catch specifically for the claimRent call ---
+            try {
+                const result = await claimRent(tokenAddress);
+                if (result.success) {
+                    setToastMessage({ type: 'success', title: "Rent Claimed!", description: `Rent for ${shortenAddress(tokenAddress)} claimed successfully.` });
+                    claimSuccessful = true;
+                    // Refresh portfolio data AFTER success and state update
+                } else {
+                    // Handle failure reported by the service function itself
+                    throw result.error || new Error("Failed to claim rent.");
+                }
+            } catch (claimErr: any) {
+                 // --- Catch errors ONLY from claimRent service call ---
+                let errorMessage = claimErr.reason || claimErr.message || "Could not claim rent.";
+                let errorTitle = "Claim Failed";
+                
+                if (errorMessage.includes("No new rent to claim")) {
+                    errorMessage = "There is currently no rent available to claim for this property.";
+                // Check for user rejection patterns
+                } else if (claimErr.code === 4001 || claimErr.message?.includes('User rejected') || claimErr.message?.includes('User denied')) {
+                    errorTitle = "Transaction Rejected";
+                    errorMessage = "You rejected the transaction in your wallet.";
+                }
+                // Set toast state for the caught error
+                setToastMessage({ type: 'error', title: errorTitle, description: errorMessage });
+                // DO NOT re-throw here - prevents overlay
             }
-        } catch (err: any) {
-            console.error("Rent claim failed:", err);
-            toast({
-                title: "Claim Failed",
-                description: err.reason || err.message || "Could not claim rent.",
-                variant: "destructive"
-            });
-            throw err; // Re-throw for ClaimRentForm to catch
+            // --- End of inner try...catch ---
+
+            // Refresh portfolio only if claim was successful
+            if (claimSuccessful) {
+                 await fetchPortfolio();
+            }
+
+        } catch (outerErr: any) {
+             // This outer catch handles unexpected errors outside the claimRent call itself
+             // (e.g., issues with setClaimingStates, fetchPortfolio)
+             console.error("Unexpected error during claim process:", outerErr);
+              setToastMessage({ type: 'error', title: "Error", description: "An unexpected error occurred." });
         } finally {
-            setClaimingStates(prev => ({ ...prev, [tokenAddress]: false }));
+             // Use setTimeout to potentially avoid state update conflicts
+             setTimeout(() => setClaimingStates(prev => ({ ...prev, [tokenAddress]: false })), 0);
         }
     };
 
@@ -280,7 +333,11 @@ export default function PortfolioPage() {
                                     </div>
                                     <Button
                                         className="w-full crypto-btn"
-                                        onClick={() => handleClaimRent(tokenAddress)}
+                                        onClick={() => {
+                                            handleClaimRent(tokenAddress).catch(err => {
+                                                console.log("Caught rent claim rejection at onClick, toast already shown:", err.message);
+                                            });
+                                        }}
                                         disabled={isClaiming}
                                     >
                                         {isClaiming ? (

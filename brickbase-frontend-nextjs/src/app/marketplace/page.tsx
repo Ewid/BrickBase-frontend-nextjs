@@ -13,7 +13,7 @@ import BuyTokensForm from '@/components/BuyTokensForm';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { Store } from 'lucide-react';
 import { ImageOff } from 'lucide-react';
 import { ethers } from 'ethers';
@@ -123,7 +123,7 @@ export default function MarketplacePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedListing, setSelectedListing] = useState<EnrichedListing | null>(null);
-  const [purchaseAmount, setPurchaseAmount] = useState('0.000001');
+  const [purchaseAmount, setPurchaseAmount] = useState('0');
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [showCreateListingModal, setShowCreateListingModal] = useState(false);
   const [userProperties, setUserProperties] = useState<EnrichedPropertyDto[]>([]);
@@ -134,6 +134,7 @@ export default function MarketplacePage() {
   const [isListing, setIsListing] = useState(false);
   const [approvalComplete, setApprovalComplete] = useState(false);
   const [listingComplete, setListingComplete] = useState(false);
+  const [purchaseErrorToast, setPurchaseErrorToast] = useState<{ title: string; description: string } | null>(null);
   
   const apiUrl = 'http://localhost:3000'; // Your backend API URL
   
@@ -237,7 +238,7 @@ export default function MarketplacePage() {
   
   const handleListingSelect = (listing: EnrichedListing) => {
     setSelectedListing(listing);
-    setPurchaseAmount('0.000001'); // Reset to minimum amount
+    setPurchaseAmount('0'); // Reset to minimum amount
     setError(null);
   };
   
@@ -256,6 +257,7 @@ export default function MarketplacePage() {
     try {
       setIsPurchasing(true);
       setError(null);
+      setPurchaseErrorToast(null);
 
       // Convert purchaseAmount to token amount with 18 decimals
       const tokenAmount = ethers.parseUnits(purchaseAmount, 18);
@@ -273,32 +275,34 @@ export default function MarketplacePage() {
       
       console.log('Purchase transaction successful:', result);
 
-      toast({
-        title: "Tokens purchased successfully!",
+      toast.success("Tokens purchased successfully!", {
         description: `You've purchased ${purchaseAmount} tokens for ${result.usdcAmount} USDC.`,
       });
       handlePurchaseSuccess();
     } catch (error: any) {
-      console.error("Error in handlePurchase:", error);
+      // console.error("Error in handlePurchase:", error); // Keep commented out
       
-      // Enhanced error details for USDC balance issues
+      // Set state to trigger toast via useEffect, instead of calling toast directly
       if (error.message?.includes('do not have enough USDC')) {
-        setError(error.message);
-        toast({
-          variant: "destructive",
-          title: "Insufficient USDC Balance",
-          description: error.message,
+        setPurchaseErrorToast({ 
+          title: "Insufficient USDC Balance", 
+          description: error.message 
+        });
+      // Check for user rejection patterns
+      } else if (error.code === 4001 || error.message?.includes('User rejected') || error.message?.includes('User denied')) {
+        setPurchaseErrorToast({ 
+          title: "Transaction Rejected", 
+          description: "You rejected the transaction in your wallet." 
         });
       } else {
-        setError(error.message || "Failed to purchase tokens");
-        toast({
-          variant: "destructive",
-          title: "Transaction failed",
-          description: error.message || "There was an error processing your transaction.",
+        setPurchaseErrorToast({ 
+          title: "Transaction failed", 
+          description: error.message || "There was an error processing your transaction." 
         });
       }
     } finally {
-      setIsPurchasing(false);
+      // Use setTimeout to defer the state update slightly, potentially avoiding the render conflict
+      setTimeout(() => setIsPurchasing(false), 0);
     }
   };
   
@@ -383,13 +387,17 @@ export default function MarketplacePage() {
     }
   }, [account]);
   
+  // Add useEffect to display the purchase error toast when state changes
+  useEffect(() => {
+    if (purchaseErrorToast) {
+      toast.error(purchaseErrorToast.title, { description: purchaseErrorToast.description });
+      setPurchaseErrorToast(null); // Reset after showing
+    }
+  }, [purchaseErrorToast]);
+  
   const handleCreateListingClick = () => {
     if (!isConnected) {
-      toast({
-        title: "Connect your wallet",
-        description: "You need to connect your wallet to create a listing",
-        variant: "destructive"
-      });
+      toast.error("Connect your wallet", { description: "You need to connect your wallet to create a listing" });
       return;
     }
     
@@ -411,10 +419,7 @@ export default function MarketplacePage() {
     setSelectedProperty(null);
     // Refresh listings to show the new one
     fetchListings();
-    toast({
-      title: "Listing created!",
-      description: "Your property has been listed on the marketplace",
-    });
+    toast.success("Listing created!", { description: "Your property has been listed on the marketplace" });
   };
   
   const handleApprovalStart = () => {
@@ -451,13 +456,9 @@ export default function MarketplacePage() {
       setIsListing(false);
     }
     
-    toast({
-      title: "Transaction Failed",
-      description: error.message || "Failed to complete transaction",
-      variant: "destructive"
-    });
+    toast.error("Transaction Failed", { description: error.message || "Failed to complete transaction" });
   };
-  
+
   const renderContent = () => {
     if (isLoading) {
       return (
@@ -770,8 +771,8 @@ export default function MarketplacePage() {
                                     <Input
                                       id="tokenAmount"
                                       type="number"
-                                      min="0.000001"
-                                      step="0.000001"
+                                      min="0"
+                                      step="1"
                                       max={selectedListing.formattedAmount}
                                       value={purchaseAmount}
                                       onChange={(e) => setPurchaseAmount(e.target.value)}
@@ -789,8 +790,8 @@ export default function MarketplacePage() {
                                 <Slider
                                   value={[parseFloat(purchaseAmount)]}
                                   max={parseFloat(selectedListing.formattedAmount)}
-                                  min={0.000001}
-                                  step={0.000001}
+                                  min={0}
+                                  step={1}
                                   onValueChange={(values) => setPurchaseAmount(values[0].toString())}
                                   className="my-4"
                                 />

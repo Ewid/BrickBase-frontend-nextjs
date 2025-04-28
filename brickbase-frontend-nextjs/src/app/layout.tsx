@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Providers } from "@/components/Providers";
 import RemoveWalletBadge from "@/components/RemoveWalletBadge";
+import { Toaster } from 'sonner';
 
 
 const inter = Inter({ subsets: ["latin"] });
@@ -25,6 +26,7 @@ export default function RootLayout({
             {children}
           </main>
           <RemoveWalletBadge />
+          <Toaster position="bottom-right" richColors theme="dark" />
         </Providers>
       </body>
     </html>

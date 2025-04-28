@@ -12,7 +12,7 @@ import { useAccount } from '@/hooks/useAccount';
 import { ethers } from 'ethers';
 import CONTRACT_CONFIG from '@/config/contracts'; // Assuming DAO address is in config
 import PropertyDAOABI from '@/abis/PropertyDAO.json'; // Assuming you have the DAO ABI
-import { toast } from '@/components/ui/use-toast'; // For notifications
+import { toast } from 'sonner'; // Import sonner
 import { PropertyDto } from '@/types/dtos'; // Import PropertyDto
 import { getPropertyByTokenAddress } from '@/services/property'; // Import property service function
 import { tryConvertIpfsUrl } from '@/services/marketplace'; // For image URLs
@@ -72,17 +72,26 @@ function getStatusVariant(state: string): "default" | "secondary" | "destructive
     }
 }
 
+// Define interface for toast messages
+interface ToastMessage {
+    type: 'success' | 'error' | 'info';
+    title: string;
+    description?: string;
+}
+
 export default function DaoPage() {
     const { account, isConnected } = useAccount();
     const [proposals, setProposals] = useState<Proposal[]>([]);
     const [propertyDetailsCache, setPropertyDetailsCache] = useState<Record<string, PropertyDto | null>>({});
     const [userOwnedTokens, setUserOwnedTokens] = useState<PropertyDto[]>([]); // State for user's owned tokens
-  const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(true);
     const [isLoadingDetails, setIsLoadingDetails] = useState(false);
     const [isLoadingUserTokens, setIsLoadingUserTokens] = useState(false); // Loading state for user tokens
-  const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
     const [votingStates, setVotingStates] = useState<Record<number, boolean>>({});
     const [showCreateProposalModal, setShowCreateProposalModal] = useState(false);
+    // Add state for toast messages
+    const [toastMessage, setToastMessage] = useState<ToastMessage | null>(null);
 
     const fetchProposalsAndDetails = async () => {
       setIsLoading(true);
@@ -192,6 +201,24 @@ export default function DaoPage() {
         }
     }, [account, isConnected]); // Add dependencies
 
+    // UseEffect to display toast messages
+    useEffect(() => {
+        if (toastMessage) {
+            switch (toastMessage.type) {
+                case 'success':
+                    toast.success(toastMessage.title, { description: toastMessage.description });
+                    break;
+                case 'error':
+                    toast.error(toastMessage.title, { description: toastMessage.description });
+                    break;
+                case 'info':
+                    toast.info(toastMessage.title, { description: toastMessage.description });
+                    break;
+            }
+            setToastMessage(null); // Reset after showing
+        }
+    }, [toastMessage]);
+
     // --- Smart Contract Interactions (Stubs) ---
 
     const getDaoContract = async (signer: ethers.Signer) => {
@@ -202,7 +229,7 @@ export default function DaoPage() {
 
     const handleVote = async (proposalId: number, support: boolean) => {
         if (!isConnected || !account) {
-            toast({ title: "Connect Wallet", description: "Please connect your wallet to vote.", variant: "destructive" });
+            setToastMessage({ type: 'error', title: "Connect Wallet", description: "Please connect your wallet to vote." });
             return;
         }
         if (votingStates[proposalId]) return; // Prevent double voting while processing
@@ -216,43 +243,49 @@ export default function DaoPage() {
 
             console.log(`Casting vote for proposal ${proposalId}, support: ${support}`);
             const tx = await contract.castVote(proposalId, support);
-            
-            toast({ title: "Transaction Submitted", description: "Waiting for confirmation..." });
-            
+
+            setToastMessage({ type: 'info', title: "Transaction Submitted", description: "Waiting for confirmation..." });
+
             await tx.wait(); // Wait for transaction confirmation
 
-            toast({ title: "Vote Cast Successfully!", description: `Your vote on proposal #${proposalId} has been recorded.` });
+            setToastMessage({ type: 'success', title: "Vote Cast Successfully!", description: `Your vote on proposal #${proposalId} has been recorded.` });
             fetchProposalsAndDetails(); // Use the renamed function
 
-      } catch (err: any) {
-            console.error("Voting failed:", err);
-            toast({
-                title: "Voting Failed",
-                description: err.reason || err.message || "An error occurred while casting your vote.",
-                variant: "destructive"
-            });
-      } finally {
-             setVotingStates(prev => ({ ...prev, [proposalId]: false }));
+        } catch (err: any) {
+            // console.error("Voting failed:", err); // Keep commented out
+            let toastTitle = "Voting Failed";
+            let toastDescription = err.reason || err.message || "An error occurred while casting your vote.";
+
+            // Check for user rejection patterns
+            if (err.code === 4001 || err.message?.includes('User rejected') || err.message?.includes('User denied')) {
+                toastTitle = "Transaction Rejected";
+                toastDescription = "You rejected the transaction in your wallet.";
+            }
+
+            setToastMessage({ type: 'error', title: toastTitle, description: toastDescription });
+        } finally {
+             // Use setTimeout to potentially avoid state update conflicts
+             setTimeout(() => setVotingStates(prev => ({ ...prev, [proposalId]: false })), 0);
         }
     };
 
     // Placeholder - Actual claim rent logic might belong elsewhere or need more context
     const handleClaimRent = () => {
          if (!isConnected || !account) {
-            toast({ title: "Connect Wallet", description: "Please connect your wallet to claim rent.", variant: "destructive" });
+            setToastMessage({ type: 'error', title: "Connect Wallet", description: "Please connect your wallet to claim rent." });
             return;
         }
         console.log("Claim Rent button clicked - Implement actual logic");
         // TODO: Implement interaction with RentDistribution contract
         // Needs to know WHICH property token address to claim for.
         // This might involve fetching user's owned tokens and their claimable amounts separately.
-        toast({ title: "Claim Rent (Not Implemented)", description: "Rent claiming functionality needs implementation.", variant: "default" });
+        setToastMessage({ type: 'info', title: "Claim Rent (Not Implemented)", description: "Rent claiming functionality needs implementation." });
     };
 
     // Placeholder - Needs implementation (modal or new page)
     const handleCreateProposalClick = () => {
         if (!isConnected || !account) {
-            toast({ title: "Connect Wallet", description: "Please connect your wallet to create a proposal.", variant: "destructive" });
+            setToastMessage({ type: 'error', title: "Connect Wallet", description: "Please connect your wallet to create a proposal." });
             return;
         }
         setShowCreateProposalModal(true); // Open the modal

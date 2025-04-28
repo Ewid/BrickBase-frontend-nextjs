@@ -83,6 +83,7 @@ export interface ProposalDto {
   endTime: number;          // When voting ends
   executed: boolean;        // Whether executed yet
   passed: boolean;          // Whether passed or failed
+  state: string;
 }
 
 export interface ExpenseRecordDto {

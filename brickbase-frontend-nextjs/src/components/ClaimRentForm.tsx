@@ -71,7 +71,11 @@ const ClaimRentForm = ({
         setSuccess(false);
 
         try {
-            await handleClaimRent(selectedProperty.tokenAddress); 
+            await handleClaimRent(selectedProperty.tokenAddress).catch(internalErr => {
+                console.log("Re-throwing error from inner handleClaimRent catch");
+                throw internalErr; 
+            });
+
             setSuccess(true); 
             if (onSuccess) {
                 onSuccess(selectedProperty.tokenAddress);
@@ -81,7 +85,6 @@ const ClaimRentForm = ({
             }, 2000); 
         } catch (err: any) {
             setError(err.reason || err.message || "An unexpected error occurred during the claim process.");
-            console.error("Claim failed (in form):", err);
         } finally {
             setIsSubmitting(false);
         }

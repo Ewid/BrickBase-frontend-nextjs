@@ -27,6 +27,14 @@ import { toast } from "sonner";
 import { parseEther } from 'ethers'; // For handling ETH values if needed
 import { useRouter } from 'next/navigation';
 
+// Define interface for toast messages (can be reused or defined locally)
+interface ToastMessage {
+    type: 'success' | 'error' | 'info' | 'loading';
+    title: string;
+    description?: string;
+    id?: string; // Optional ID for loading toasts
+}
+
 // --- Constants --- TODO: Move to config/env
 const DAO_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_DAO_CONTRACT_ADDRESS as `0x${string}` | undefined;
 
@@ -49,6 +57,8 @@ const CreateProposalPage = () => {
   const { writeContract, data: hash, isPending, isSuccess, isError, error: writeError } = useWriteContract(); 
   // Rename state to avoid conflict with isPending from hook
   const [isSubmittingForm, setIsSubmittingForm] = useState(false); 
+  // Add state for toast messages
+  const [toastMessage, setToastMessage] = useState<ToastMessage | null>(null);
 
   // React Hook Form setup
   const form = useForm<ProposalFormValues>({
@@ -63,66 +73,96 @@ const CreateProposalPage = () => {
 
   // --- Form Submission Handler ---
   const onSubmit = async (data: ProposalFormValues) => {
-    // Use isPending from the hook to manage loading state related to transaction
-    // setIsSubmittingForm(true); // We'll rely on isPending now
     console.log("Form submitted:", data);
+    setToastMessage(null); // Clear previous toasts
     
     if (!isConnected || !userAddress) {
-        toast.error("Please connect your wallet to create a proposal.");
-        // setIsSubmittingForm(false);
+        setToastMessage({ type: 'error', title: "Connect Wallet", description: "Please connect your wallet to create a proposal." });
         return;
     }
-    // Ensure ABI and Address are present before attempting write
     if (!DAO_CONTRACT_ADDRESS || !DAO_ABI) {
-        toast.error("DAO interaction is not configured correctly.");
+        setToastMessage({ type: 'error', title: "Configuration Error", description: "DAO interaction is not configured correctly." });
         console.error("Missing DAO Contract address or ABI");
-        // setIsSubmittingForm(false);
         return;
     }
 
-    // --- Implement writeContract call for 'propose' function ---
+    // Trigger writeContract
     writeContract({
         address: DAO_CONTRACT_ADDRESS,
         abi: DAO_ABI,
         functionName: 'propose',
         args: [
-            [data.targetAddress as `0x${string}`], // targets (array)
-            [BigInt(0)], // values (array - Use BigInt(0) instead of 0n)
-            [data.callData as `0x${string}`], // calldatas (array)
-            data.description, // description (string)
+            [data.targetAddress as `0x${string}`],
+            [BigInt(0)], 
+            [data.callData as `0x${string}`],
+            data.description,
         ],
     });
   };
 
-   // --- Add useEffect to handle writeContract status ---
+  // UseEffect to display toast messages
+  useEffect(() => {
+    if (toastMessage) {
+        switch (toastMessage.type) {
+            case 'success':
+                toast.success(toastMessage.title, { id: toastMessage.id, description: toastMessage.description, duration: toastMessage.id === 'propose-toast' ? 5000 : undefined });
+                break;
+            case 'error':
+                toast.error(toastMessage.title, { id: toastMessage.id, description: toastMessage.description, duration: toastMessage.id === 'propose-toast' ? 5000 : undefined });
+                break;
+            case 'info':
+                toast.info(toastMessage.title, { id: toastMessage.id, description: toastMessage.description });
+                break;
+            case 'loading':
+                toast.loading(toastMessage.title, { id: toastMessage.id, description: toastMessage.description });
+                break;
+        }
+        // Don't reset immediately if it's a loading toast that will be updated
+        if (toastMessage.type !== 'loading') {
+           setTimeout(() => setToastMessage(null), 0); // Reset with slight delay
+        }
+    }
+  }, [toastMessage]);
+
+   // useEffect to handle useWriteContract status and set toast state
    useEffect(() => {
         if (isPending) {
-            setIsSubmittingForm(true); // Show loading state on button
-            toast.loading("Submitting proposal transaction...", { id: 'propose-toast' });
+            setIsSubmittingForm(true);
+            setToastMessage({ type: 'loading', title: "Submitting proposal transaction...", id: 'propose-toast' });
         }
         if (isSuccess) {
             setIsSubmittingForm(false);
-            toast.success("Proposal submitted successfully!", { 
+            setToastMessage({ 
+                type: 'success', 
+                title: "Proposal submitted successfully!", 
                 id: 'propose-toast', 
-                description: `Transaction: ${hash?.substring(0,10)}...`,
-                duration: 5000
+                description: `Transaction: ${hash?.substring(0,10)}...`
             });
-            form.reset(); // Reset form on success
-            // Redirect user back to DAO page after a short delay
+            form.reset();
             setTimeout(() => router.push('/dao'), 2000);
         }
         if (isError) {
             setIsSubmittingForm(false);
-            console.error("Proposal Error:", writeError);
-            toast.error("Proposal failed", { 
+            console.error("Proposal Error:", writeError); // Keep console log for hook errors
+
+            let toastTitle = "Proposal failed";
+            let toastDescription = writeError?.message || 'An unknown error occurred.';
+
+            // Check for user rejection patterns in writeError
+            // @ts-ignore - Accessing internal properties for error code check
+            if (writeError?.cause?.code === 4001 || writeError?.message?.includes('User rejected') || writeError?.message?.includes('User denied')) {
+                 toastTitle = "Transaction Rejected";
+                 toastDescription = "You rejected the transaction in your wallet.";
+            }
+
+            setToastMessage({ 
+                type: 'error', 
+                title: toastTitle, 
                 id: 'propose-toast', 
-                description: writeError?.message || 'An unknown error occurred.',
-                duration: 5000
+                description: toastDescription
             });
         }
-    // Add router to dependency array if used inside effect
     }, [isPending, isSuccess, isError, hash, writeError, form, router]); 
-
 
   // --- Render Logic --- 
   return (
