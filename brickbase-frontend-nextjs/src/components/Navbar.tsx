@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Menu, X, Home, Building2, Wallet, ChartBar, User } from 'lucide-react';
 import { Button as ShadcnButton } from "@/components/ui/button";
 import ConnectWallet from './ConnectWallet';
@@ -13,7 +14,13 @@ const Navbar = () => {
     <nav className="fixed top-0 z-50 w-full glass-card py-4 px-6">
       <div className="max-w-7xl mx-auto flex justify-between items-center">
         <Link href="/" className="flex items-center space-x-2">
-          <Building2 className="w-8 h-8 text-crypto-light" />
+          <Image 
+            src="/images/brickbaselogo.png"
+            alt="BrickBase Logo" 
+            width={40}
+            height={40}
+            className="rounded-md"
+          />
           <span className="text-xl font-bold text-gradient">BrickBase</span>
         </Link>
         

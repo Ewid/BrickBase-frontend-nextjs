@@ -1,5 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Building2, Twitter, Facebook, Instagram, Linkedin } from 'lucide-react';
 
 const Footer = () => {
@@ -9,7 +10,13 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
           <div>
             <Link href="/" className="flex items-center space-x-2 mb-6">
-              <Building2 className="w-8 h-8 text-crypto-light" />
+              <Image 
+                src="/images/brickbaselogo.png"
+                alt="BrickBase Logo" 
+                width={32}
+                height={32}
+                className="rounded-md"
+              />
               <span className="text-xl font-bold text-gradient">BrickBase</span>
             </Link>
             <p className="text-gray-400 mb-6">
