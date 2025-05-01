@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Shield } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 
 // Dynamically import the actual component, disabling SSR
@@ -11,13 +11,14 @@ const ConnectWalletComponent = dynamic(
     ssr: false,
     loading: () => (
         <Button 
-            variant="outline" 
+            variant="default" 
             size="default"
             disabled 
-            className="border-crypto-light/30 text-crypto-light cursor-wait opacity-70"
+            className="relative overflow-hidden bg-gradient-to-r from-blue-600/70 to-purple-600/70 text-white border-none opacity-80 cursor-wait"
         >
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-600/30 to-purple-600/30 animate-pulse"></div>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Loading...
+            <span className="relative z-10">Initializing...</span>
         </Button>
     )
   }

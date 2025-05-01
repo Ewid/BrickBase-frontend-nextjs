@@ -39,6 +39,12 @@ const nextConfig = {
         hostname: 'nftstorage.link',
         port: '',
         pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'green-fast-reptile-18.mypinata.cloud',
+        port: '',
+        pathname: '/ipfs/**',
       }
     ],
     formats: ['image/avif', 'image/webp'],

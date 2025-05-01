@@ -23,6 +23,7 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import ClaimRentForm from '@/components/ClaimRentForm';
+import PortfolioTabs from '@/components/PortfolioTabs';
 
 
 interface PortfolioProperty extends PropertyDto {
@@ -185,7 +186,7 @@ export default function PortfolioPage() {
         }
     }, [toastMessage]);
 
-    
+    // Handle claiming rent for a property token
     const handleClaimRent = async (tokenAddress: string): Promise<void> => { 
         if (!tokenAddress || claimingStates[tokenAddress]) return;
 
@@ -193,53 +194,44 @@ export default function PortfolioPage() {
         let claimSuccessful = false; 
 
         try {
-             
             try {
                 const result = await claimRent(tokenAddress);
                 if (result.success) {
-                    setToastMessage({ type: 'success', title: "Rent Claimed!", description: `Rent for ${shortenAddress(tokenAddress)} claimed successfully.` });
+                    setToastMessage({ 
+                        type: 'success', 
+                        title: "Rent Claimed!", 
+                        description: `Rent for ${shortenAddress(tokenAddress)} claimed successfully.` 
+                    });
                     claimSuccessful = true;
-                    
                 } else {
-                    
                     throw result.error || new Error("Failed to claim rent.");
                 }
             } catch (claimErr: any) {
-                 
                 let errorMessage = claimErr.reason || claimErr.message || "Could not claim rent.";
                 let errorTitle = "Claim Failed";
                 
                 if (errorMessage.includes("No new rent to claim")) {
                     errorMessage = "There is currently no rent available to claim for this property.";
-                
                 } else if (claimErr.code === 4001 || claimErr.message?.includes('User rejected') || claimErr.message?.includes('User denied')) {
                     errorTitle = "Transaction Rejected";
                     errorMessage = "You rejected the transaction in your wallet.";
                 }
                 
                 setToastMessage({ type: 'error', title: errorTitle, description: errorMessage });
-                
             }
-            
 
-            
             if (claimSuccessful) {
-                 await fetchPortfolio();
+                await fetchPortfolio();
             }
-
         } catch (outerErr: any) {
-             
-             
-             console.error("Unexpected error during claim process:", outerErr);
-              setToastMessage({ type: 'error', title: "Error", description: "An unexpected error occurred." });
+            console.error("Unexpected error during claim process:", outerErr);
+            setToastMessage({ type: 'error', title: "Error", description: "An unexpected error occurred." });
         } finally {
-             
-             setTimeout(() => setClaimingStates(prev => ({ ...prev, [tokenAddress]: false })), 0);
+            setTimeout(() => setClaimingStates(prev => ({ ...prev, [tokenAddress]: false })), 0);
         }
     };
-
     
-    const renderPortfolio = () => {
+    const renderPortfolioContent = () => {
         if (!isConnected) {
             return (
                 <div className="text-center py-20 text-gray-400">
@@ -249,138 +241,84 @@ export default function PortfolioPage() {
             );
         }
 
-        if (isLoading) {
-            return (
-                <div className="flex justify-center items-center py-20">
-                    <Loader2 className="h-12 w-12 animate-spin text-crypto-light" />
-                </div>
-            );
-        }
-
-        if (error) {
-            return (
-                <div className="text-center py-20 text-red-400 bg-red-900/20 rounded-lg p-6">
-                    <AlertCircle className="h-10 w-10 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold mb-2">Failed to Load Portfolio</h3>
-                    <p>{error}</p>
-                    <Button onClick={fetchPortfolio} variant="outline" className="mt-6">
-                        Retry
-                    </Button>
-                </div>
-            );
-        }
-
-        if (portfolio.length === 0) {
-            return (
-                <div className="text-center py-20 text-gray-400">
-                    <Layers className="h-12 w-12 mx-auto mb-4 opacity-50"/>
-                    <p>You do not currently own tokens for any properties.</p>
-                    <Link href="/marketplace" className="mt-4 inline-block">
-                       <Button className="crypto-btn">Explore Marketplace</Button>
-                    </Link>
-                </div>
-            );
-        }
-
-        
-        return (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {portfolio.map((prop) => {
-                    const tokenAddress = prop.tokenAddress;
-                    const imageUrl = prop.metadata?.image ? tryConvertIpfsUrl(prop.metadata.image) : '/property-placeholder.jpg';
-                    const isClaiming = claimingStates[tokenAddress] || false;
-                    const canClaim = ethers.getBigInt(prop.claimableRentAmount || '0') > 0;
-
-                    return (
-                        <Card key={tokenAddress} className="glass-card bg-gray-900/70 border border-white/10 overflow-hidden flex flex-col">
-                            <CardHeader className="p-0">
-                                <div className="relative aspect-video w-full">
-                                    <Image
-                                        src={imageUrl}
-                                        alt={prop.metadata?.name || 'Property'}
-                                        fill
-                                        className="object-cover"
-                                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                                        loading="lazy"
-                                    />
-                                </div>
-                            </CardHeader>
-                            <CardContent className="p-4 flex-grow flex flex-col justify-between">
-                                <div>
-                                    <CardTitle className="text-lg text-white mb-2 line-clamp-1" title={prop.metadata?.name}>{prop.metadata?.name || 'Unnamed Property'}</CardTitle>
-                                    <CardDescription className="text-xs text-gray-400 mb-4">Token: {shortenAddress(tokenAddress)}</CardDescription>
-
-                                    {/* Balance and Ownership */}
-                                    <div className="space-y-2 text-sm mb-4">
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-gray-400 flex items-center"><Wallet className="w-4 h-4 mr-1.5"/> Your Balance:</span>
-                                            <span className="font-medium text-white">{prop.formattedBalance}</span>
-                                        </div>
-                                         <div className="flex justify-between items-center">
-                                            <span className="text-gray-400 flex items-center"><Percent className="w-4 h-4 mr-1.5"/> Ownership:</span>
-                                            <span className="font-medium text-white">{prop.ownershipPercentage.toFixed(2)}%</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Claimable Rent & Claim Button */}
-                                <div className="mt-auto pt-4 border-t border-white/10">
-                                    <div className="flex justify-between items-center mb-3">
-                                        <span className="text-gray-400 text-sm">Claimable Rent:</span>
-                                        <span className={`font-medium text-lg ${canClaim ? 'text-green-400' : 'text-gray-500'}`}>
-                                            {prop.claimableRentFormatted}
-                                        </span>
-                                    </div>
-                                    <Button
-                                        className="w-full crypto-btn"
-                                        onClick={() => {
-                                            handleClaimRent(tokenAddress).catch(err => {
-                                                
-                                                
-                                                
-                                            });
-                                        }}
-                                        disabled={isClaiming}
-                                    >
-                                        {isClaiming ? (
-                                            <Loader2 className="h-4 w-4 mr-2 animate-spin"/>
-                                        ) : (
-                                            <Landmark className="h-4 w-4 mr-2"/>
-                                        )}
-                                        {isClaiming ? 'Claiming...' : 'Claim Rent'}
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    );
-                })}
-            </div>
-        );
+        return <PortfolioTabs properties={portfolio} isLoading={isLoading} />;
     };
 
     return (
-        <div className="min-h-screen bg-crypto-dark">
+        <div className="min-h-screen flex flex-col bg-gradient-to-b from-gray-900 via-blue-950 to-gray-950 text-white">
             <Navbar />
-            <main className="flex-grow pt-24 pb-10 px-6 max-w-7xl mx-auto w-full">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12">
-                    <div className="mb-6 md:mb-0">
-                        <h1 className="text-3xl font-bold mb-2">My <span className="text-gradient">Portfolio</span></h1>
-                        <p className="text-gray-400">Overview of your property token holdings and claimable rent.</p>
+            <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
+                {/* Enhanced header with web3 elements */}
+                <div className="relative mb-8">
+                    {/* Decorative blockchain elements */}
+                    <div className="absolute -top-10 -left-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl"></div>
+                    <div className="absolute -bottom-20 -right-10 w-60 h-60 bg-purple-500/10 rounded-full blur-3xl"></div>
+                    
+                    <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center">
+                        <div className="mb-4 md:mb-0">
+                            <h1 className="text-3xl md:text-4xl font-bold">
+                                <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-cyan-400 to-teal-400">
+                                    Your Portfolio
+                                </span>
+                            </h1>
+                            <p className="text-gray-400 mt-1">Tokenized real estate with instant global access</p>
+                        </div>
+                        
+                        <Button
+                            onClick={() => setShowClaimRentModal(true)}
+                            className="relative overflow-hidden group bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-medium py-2 px-4 rounded-lg"
+                            disabled={!isConnected}
+                        >
+                            {/* Animated glow effect */}
+                            <span className="absolute top-0 left-0 w-full h-full bg-white/20 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300"></span>
+                            <Landmark className="h-4 w-4 mr-2 inline-block" />
+                            Claim Available Rent
+                        </Button>
                     </div>
-                     <Button
-                        onClick={() => setShowClaimRentModal(true)}
-                        className="crypto-btn"
-                        disabled={!isConnected}
-                     >
-                         <Landmark className="h-4 w-4 mr-2" />
-                         Claim Available Rent
-                    </Button>
+                    
+                    {/* Web3 benefits banner */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 mb-8">
+                        <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-lg p-3 flex items-center">
+                            <div className="bg-blue-500/20 p-2 rounded-full mr-3">
+                                <Wallet className="h-5 w-5 text-blue-400" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-medium text-white">USDC Payments</h3>
+                                <p className="text-xs text-gray-400">Stable, secure rent payments</p>
+                            </div>
+                        </div>
+                        <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-lg p-3 flex items-center">
+                            <div className="bg-purple-500/20 p-2 rounded-full mr-3">
+                                <svg className="h-5 w-5 text-purple-400" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M12 16L7 13.5V8.5L12 6L17 8.5V13.5L12 16Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <path d="M12 6V11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <path d="M7 8.5L12 11L17 8.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-medium text-white">Blockchain Verified</h3>
+                                <p className="text-xs text-gray-400">Transparent ownership records</p>
+                            </div>
+                        </div>
+                        <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-lg p-3 flex items-center">
+                            <div className="bg-green-500/20 p-2 rounded-full mr-3">
+                                <svg className="h-5 w-5 text-green-400" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M3 12H21M3 12C3 16.9706 7.02944 21 12 21M3 12C3 7.02944 7.02944 3 12 3M21 12C21 16.9706 16.9706 21 12 21M21 12C21 7.02944 16.9706 3 12 3M12 3C14.5 8 15 12 12 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-medium text-white">Global Access</h3>
+                                <p className="text-xs text-gray-400">Invest from anywhere, anytime</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                {renderPortfolio()}
+                {renderPortfolioContent()}
             </main>
             <Footer />
-
+            
+            {/* Claim Rent Modal */}
             <Dialog open={showClaimRentModal} onOpenChange={setShowClaimRentModal}>
                 <DialogContent className="sm:max-w-[600px] bg-gradient-to-br from-gray-900 to-gray-950 border-blue-900/50 rounded-xl backdrop-blur-lg shadow-xl">
                     <DialogHeader>
@@ -400,4 +338,4 @@ export default function PortfolioPage() {
             </Dialog>
         </div>
     );
-} 
+}
