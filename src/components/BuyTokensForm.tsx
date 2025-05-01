@@ -111,7 +111,8 @@ const BuyTokensForm = ({ listing, onSuccess, onError }: BuyTokensFormProps) => {
     
     try {
       // Convert to full tokens with 18 decimals
-      const result = await buyTokensFromListing(listing.id, actualAmount);
+      const amountToBuyBigInt = ethers.parseUnits(userFriendlyAmount, 18); // Keep as bigint
+      const result = await buyTokensFromListing(listing.listingId.toString(), amountToBuyBigInt); 
       
       if (result.success) {
         setSuccess(true);
@@ -354,14 +355,14 @@ const BuyTokensForm = ({ listing, onSuccess, onError }: BuyTokensFormProps) => {
       )}
       
       {success && (
-        <Alert className="bg-gradient-to-r from-green-900/30 to-green-900/10 border border-green-500/30 shadow-[0_0_15px_rgba(74,222,128,0.2)] rounded-lg">
+        <Alert className="bg-green-800/90 border border-green-500/50 shadow-[0_0_15px_rgba(74,222,128,0.2)] rounded-lg">
           <div className="flex items-center">
-            <div className="bg-green-500/20 p-2 rounded-full mr-3">
-              <Check className="h-5 w-5 text-green-400" />
+            <div className="bg-green-700/50 p-2 rounded-full mr-3">
+              <Check className="h-5 w-5 text-green-300" /> 
             </div>
             <div>
-              <h4 className="text-sm font-medium text-green-400 mb-1">Success</h4>
-              <AlertDescription className="text-green-300/90 text-sm">Purchase completed successfully! The tokens have been added to your wallet.</AlertDescription>
+              <h4 className="text-sm font-medium text-white mb-1">Success</h4> 
+              <AlertDescription className="text-white/90 text-sm">Purchase completed successfully! The tokens have been added to your wallet.</AlertDescription>
             </div>
           </div>
         </Alert>

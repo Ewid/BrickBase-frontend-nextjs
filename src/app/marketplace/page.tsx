@@ -367,10 +367,30 @@ export default function MarketplacePage() {
       if (!response.ok) {
         throw new Error(`Failed to fetch user properties: ${response.statusText}`);
       }
-      const data: EnrichedPropertyDto[] = await response.json();
-      // Enrich properties with balance if needed (similar to DAO page logic)
-      // For now, just set the fetched properties
-      setUserProperties(data);
+      const ownedProperties: PropertyDto[] = await response.json(); // <-- Get initial properties
+
+      // Enrich properties with balance
+      const enrichedPropertiesPromises = ownedProperties.map(async (prop) => {
+        const tokenAddr = prop.tokenAddress || prop.propertyDetails?.associatedPropertyToken;
+        if (!tokenAddr) {
+            console.warn(`Skipping balance fetch for property ${prop.id} due to missing token address.`);
+            return { ...prop, balance: '0' }; // Return with 0 balance if no address
+        }
+        try {
+            const userBalance = await getTokenBalance(tokenAddr, account);
+            // Optional: format balance here if needed, but CreateListingForm already does
+            // const formatted = formatCurrency(userBalance);
+            return { ...prop, balance: userBalance /*, formattedBalance: formatted */ };
+        } catch (balanceError) {
+            console.error(`Failed to fetch balance for ${tokenAddr}:`, balanceError);
+            return { ...prop, balance: '0' }; // Return with 0 balance on error
+        }
+      });
+
+      const enrichedProperties = await Promise.all(enrichedPropertiesPromises);
+
+      setUserProperties(enrichedProperties); // <-- Set the enriched list
+
     } catch (err: any) {
       console.error("Error fetching user properties:", err);
       toast.error("Could not load your properties", { description: err.message });
@@ -673,6 +693,35 @@ export default function MarketplacePage() {
         </div>
       </main>
       <Footer />
+
+      {/* Create Listing Modal */}
+      <Dialog open={showCreateListingModal} onOpenChange={setShowCreateListingModal}>
+          <DialogContent className="sm:max-w-[700px] bg-gradient-to-br from-gray-900 to-gray-950 border-blue-900/50 rounded-xl backdrop-blur-lg shadow-xl">
+              <DialogHeader>
+                  <DialogTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">Create New Listing</DialogTitle>
+                  <DialogDescription className="text-gray-300 pt-1">
+                      Select one of your owned properties and specify the amount and price per token (in USDC) to list for sale.
+                  </DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                {isLoadingUserProperties ? (
+                  <div className="flex justify-center items-center h-40">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+                  </div>
+                ) : (
+                  <CreateListingForm
+                      ownedTokens={userProperties} 
+                      onSuccess={() => {
+                          setShowCreateListingModal(false);
+                          fetchListings(); // Refresh listings after creating one
+                      }}
+                      onClose={() => setShowCreateListingModal(false)} 
+                  />
+                )}
+              </div>
+          </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

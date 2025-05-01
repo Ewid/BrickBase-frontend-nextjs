@@ -1868,6 +1868,10 @@ body > div:last-of-type > div.flex.instant-badge.gap-2:has(> div > span.text-cry
 .border-blue-500\/10 {
   border-color: rgb(59 130 246 / 0.1);
 }
+.border-blue-700 {
+  --tw-border-opacity: 1;
+  border-color: rgb(29 78 216 / var(--tw-border-opacity, 1));
+}
 .border-l-blue-500 {
   --tw-border-opacity: 1;
   border-left-color: rgb(59 130 246 / var(--tw-border-opacity, 1));
@@ -2047,6 +2051,16 @@ body > div:last-of-type > div.flex.instant-badge.gap-2:has(> div > span.text-cry
 }
 .bg-yellow-900\/20 {
   background-color: rgb(113 63 18 / 0.2);
+}
+.bg-green-700\/50 {
+  background-color: rgb(21 128 61 / 0.5);
+}
+.bg-green-800\/90 {
+  background-color: rgb(22 101 52 / 0.9);
+}
+.bg-gray-900 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(17 24 39 / var(--tw-bg-opacity, 1));
 }
 .bg-gradient-radial {
   background-image: radial-gradient(var(--tw-gradient-stops));
@@ -2793,6 +2807,9 @@ body > div:last-of-type > div.flex.instant-badge.gap-2:has(> div > span.text-cry
 .text-yellow-500 {
   --tw-text-opacity: 1;
   color: rgb(234 179 8 / var(--tw-text-opacity, 1));
+}
+.text-white\/90 {
+  color: rgb(255 255 255 / 0.9);
 }
 .underline-offset-4 {
   text-underline-offset: 4px;
