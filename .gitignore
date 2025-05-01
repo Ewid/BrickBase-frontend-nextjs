@@ -13,3 +13,27 @@ yarn-error.log*
 
 # macOS
 .DS_Store
+
+# Next.js build output
+.next/
+out/
+
+# Static build artifacts (auto-generated)
+*.log
+.cache/
+coverage/
+dist/
+build/
+static/chunks/
+static/css/
+static/media/
+static/web/
+
+# Webpack/Server cache (inside .next)
+.next/cache/
+.next/server/
+
+# Custom static or vendor chunk folders (if generated)
+static/vendor/
+vendor/
+

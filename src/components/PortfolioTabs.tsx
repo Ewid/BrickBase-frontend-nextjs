@@ -175,28 +175,40 @@ const PortfolioTabs: React.FC<PortfolioTabsProps> = ({
 
   return (
     <Tabs defaultValue="overview" className="w-full">
-      {/* Enhanced TabsList with futuristic design */}
-      <TabsList className="w-full bg-gradient-to-r from-gray-900/80 via-blue-950/50 to-gray-900/80 border border-blue-500/20 rounded-xl mb-6 p-1 backdrop-blur-sm shadow-lg shadow-blue-500/5">
+      {/* Enhanced TabsList with futuristic web3 design */}
+      <TabsList className="w-full bg-gradient-to-r from-gray-900/90 via-blue-950/60 to-gray-900/90 border border-blue-500/30 rounded-xl mb-8 p-1.5 backdrop-blur-sm shadow-[0_0_20px_rgba(59,130,246,0.15)]">
         <TabsTrigger 
           value="overview" 
-          className="flex-1 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600/20 data-[state=active]:to-cyan-600/20 data-[state=active]:text-blue-400 data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-lg transition-all duration-200"
+          className="flex-1 py-3 text-gray-300 hover:text-white data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600/30 data-[state=active]:to-cyan-600/30 data-[state=active]:text-white data-[state=active]:shadow-[0_0_10px_rgba(59,130,246,0.3)] data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-lg transition-all duration-300"
         >
-          <LayoutDashboard className="h-4 w-4 mr-2" />
-          Overview
+          <div className="flex items-center justify-center">
+            <div className="bg-blue-500/20 p-1.5 rounded-md mr-2">
+              <LayoutDashboard className="h-4 w-4 text-blue-400" />
+            </div>
+            <span className="font-medium">Overview</span>
+          </div>
         </TabsTrigger>
         <TabsTrigger 
           value="transactions" 
-          className="flex-1 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600/20 data-[state=active]:to-cyan-600/20 data-[state=active]:text-blue-400 data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-lg transition-all duration-200"
+          className="flex-1 py-3 text-gray-300 hover:text-white data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600/30 data-[state=active]:to-blue-600/30 data-[state=active]:text-white data-[state=active]:shadow-[0_0_10px_rgba(124,58,237,0.3)] data-[state=active]:border-b-2 data-[state=active]:border-purple-500 rounded-lg transition-all duration-300"
         >
-          <History className="h-4 w-4 mr-2" />
-          Transactions
+          <div className="flex items-center justify-center">
+            <div className="bg-purple-500/20 p-1.5 rounded-md mr-2">
+              <History className="h-4 w-4 text-purple-400" />
+            </div>
+            <span className="font-medium">Transactions</span>
+          </div>
         </TabsTrigger>
         <TabsTrigger 
           value="analytics" 
-          className="flex-1 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600/20 data-[state=active]:to-cyan-600/20 data-[state=active]:text-blue-400 data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-lg transition-all duration-200"
+          className="flex-1 py-3 text-gray-300 hover:text-white data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-600/30 data-[state=active]:to-green-600/30 data-[state=active]:text-white data-[state=active]:shadow-[0_0_10px_rgba(6,182,212,0.3)] data-[state=active]:border-b-2 data-[state=active]:border-cyan-500 rounded-lg transition-all duration-300"
         >
-          <BarChart3 className="h-4 w-4 mr-2" />
-          Analytics
+          <div className="flex items-center justify-center">
+            <div className="bg-cyan-500/20 p-1.5 rounded-md mr-2">
+              <BarChart3 className="h-4 w-4 text-cyan-400" />
+            </div>
+            <span className="font-medium">Analytics</span>
+          </div>
         </TabsTrigger>
       </TabsList>
 

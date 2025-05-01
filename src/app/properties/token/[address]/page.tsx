@@ -6,7 +6,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
-import { Building2, MapPin, Tag, ArrowLeft, Loader2, AlertTriangle, ShoppingCart } from "lucide-react";
+import { Building2, MapPin, Tag, ArrowLeft, Loader2, AlertTriangle, ShoppingCart, Shield } from "lucide-react";
 import Link from 'next/link';
 import { PropertyDto } from '@/types/dtos';
 import { formatUnits } from 'ethers';
@@ -90,7 +90,7 @@ const TokenPropertyDetailPage = () => {
         console.log("Property data from API (token lookup):", data);
         
         // Ensure propertyDetails exists (create it if not present)
-        if (!data?.propertyDetails) {
+        if (data && !data.propertyDetails) {
           data.propertyDetails = {
             physicalAddress: 'Address not available',
             sqft: 0,
@@ -253,87 +253,118 @@ const TokenPropertyDetailPage = () => {
           </div>
         )}
         
-        <div className="glass-card rounded-xl overflow-hidden">
+        <div className="glass-card-vibrant rounded-xl overflow-hidden border border-blue-500/30 shadow-[0_0_30px_rgba(59,130,246,0.15)]">
           <div className="relative h-96 w-full bg-gray-800">
             {imageUrl ? (
-               <Image 
-                 src={imageUrl} 
-                 alt={displayTitle}
-                 fill
-                 className="object-cover"
-                 sizes="(max-width: 1024px) 100vw, 1024px"
-                 priority
-               />
+               <div className="relative h-full w-full">
+                 <Image 
+                   src={imageUrl} 
+                   alt={displayTitle}
+                   fill
+                   className="object-cover"
+                   sizes="(max-width: 1024px) 100vw, 1024px"
+                   priority
+                 />
+                 {/* Overlay with futuristic elements */}
+                 <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-transparent to-transparent"></div>
+                 <div className="absolute top-4 right-4 blockchain-badge shadow-lg">
+                   <Shield className="h-4 w-4 mr-1" />
+                   <span>Blockchain Verified</span>
+                 </div>
+               </div>
              ) : (
-               <div className="w-full h-full flex items-center justify-center text-gray-400">Image loading or unavailable...</div>
+               <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gradient-to-br from-gray-900 to-gray-800">
+                 <Building2 className="h-12 w-12 text-gray-600 mb-2" />
+                 <span className="text-gray-500">Image loading or unavailable...</span>
+               </div>
              )}
           </div>
           
           <div className="p-6 md:p-8">
-            <div className="flex flex-col md:flex-row justify-between md:items-center mb-4">
-              <h1 className="text-3xl font-bold mb-2 md:mb-0 text-white" title={displayTitle}>{displayTitle}</h1>
-              <div className="flex items-center text-gray-400 text-sm">
-                <MapPin className="h-4 w-4 mr-1" />
-                {address}
+            <div className="flex flex-col md:flex-row justify-between md:items-center mb-6">
+              <h1 className="text-3xl font-bold mb-2 md:mb-0 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]" title={displayTitle}>{displayTitle}</h1>
+              <div className="flex items-center text-gray-300 text-sm bg-gray-900/50 backdrop-blur-sm px-3 py-1.5 rounded-md border border-blue-500/20 shadow-inner">
+                <MapPin className="h-4 w-4 mr-2 text-blue-400" />
+                <span className="font-medium">{address}</span>
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-4 mb-6 border-b border-white/10 pb-6">
-               <div className="flex items-center gap-1 text-sm bg-crypto-dark/50 px-3 py-1 rounded-full">
-                  <Building2 className="h-4 w-4 text-crypto-light" />
-                  <span className="text-gray-200">{sqft} sqft</span>
+            <div className="flex flex-wrap gap-4 mb-6 border-b border-blue-500/20 pb-6">
+               <div className="flex items-center gap-2 text-sm bg-gray-900/50 backdrop-blur-sm px-3 py-1.5 rounded-full border border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.1)]">
+                  <Building2 className="h-4 w-4 text-blue-400" />
+                  <span className="text-gray-200 font-medium">{sqft} sqft</span>
                 </div>
-                <div className="flex items-center gap-1 text-sm bg-crypto-dark/50 px-3 py-1 rounded-full">
-                  <Tag className="h-4 w-4 text-crypto-light" />
-                  <span className="text-gray-200">{bedrooms} Beds</span>
+                <div className="flex items-center gap-2 text-sm bg-gray-900/50 backdrop-blur-sm px-3 py-1.5 rounded-full border border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.1)]">
+                  <Tag className="h-4 w-4 text-blue-400" />
+                  <span className="text-gray-200 font-medium">{bedrooms} Beds</span>
                 </div>
-                 <div className="flex items-center gap-1 text-sm bg-crypto-dark/50 px-3 py-1 rounded-full">
-                  <Tag className="h-4 w-4 text-crypto-light" />
-                  <span className="text-gray-200">{bathrooms} Baths</span>
+                <div className="flex items-center gap-2 text-sm bg-gray-900/50 backdrop-blur-sm px-3 py-1.5 rounded-full border border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.1)]">
+                  <Tag className="h-4 w-4 text-blue-400" />
+                  <span className="text-gray-200 font-medium">{bathrooms} Baths</span>
                 </div>
-                 <div className="flex items-center gap-1 text-sm bg-crypto-dark/50 px-3 py-1 rounded-full">
-                  <Tag className="h-4 w-4 text-crypto-light" />
-                  <span className="text-gray-200">Built: {yearBuilt}</span>
+                <div className="flex items-center gap-2 text-sm bg-gray-900/50 backdrop-blur-sm px-3 py-1.5 rounded-full border border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.1)]">
+                  <Tag className="h-4 w-4 text-blue-400" />
+                  <span className="text-gray-200 font-medium">Built: {yearBuilt}</span>
                 </div>
-                <div className="flex items-center gap-1 text-sm bg-crypto-dark/50 px-3 py-1 rounded-full">
-                  <Tag className="h-4 w-4 text-crypto-light" />
-                  <span className="text-gray-200">Type: {propertyType}</span>
+                <div className="flex items-center gap-2 text-sm bg-gray-900/50 backdrop-blur-sm px-3 py-1.5 rounded-full border border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.1)]">
+                  <Tag className="h-4 w-4 text-blue-400" />
+                  <span className="text-gray-200 font-medium">Type: {propertyType}</span>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-6">
               <div className="md:col-span-2">
-                <h2 className="text-xl font-semibold mb-3 text-white">Description</h2>
-                <p className="text-gray-300 leading-relaxed">{displayDescription}</p>
-                
-                <h3 className="text-lg font-semibold mt-6 mb-2 text-white">Contract Details</h3>
-                <div className="text-xs text-gray-400 space-y-1 break-all">
-                    <p>NFT Address: {property.id || 'N/A'}</p>
-                    <p>Token Address: {tokenAddress || 'Not available'}</p>
-                    {property.totalSupply && (
-                      <p>Total Supply: {formatUnits(property.totalSupply, 18)} tokens</p>
-                    )}
+                <div className="bg-gray-900/30 backdrop-blur-sm p-5 rounded-xl border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.1)]">
+                  <h2 className="text-xl font-semibold mb-3 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">Property Description</h2>
+                  <p className="text-gray-300 leading-relaxed">{displayDescription}</p>
+                  
+                  <div className="mt-6 pt-6 border-t border-blue-500/20">
+                    <h3 className="text-lg font-semibold mb-3 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">Blockchain Details</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="bg-gray-800/50 p-3 rounded-lg border border-blue-500/20">
+                        <div className="text-xs text-gray-400 font-medium mb-1">NFT Contract</div>
+                        <div className="blockchain-address text-sm text-blue-300 break-all font-mono">{property.id || 'N/A'}</div>
+                      </div>
+                      <div className="bg-gray-800/50 p-3 rounded-lg border border-blue-500/20">
+                        <div className="text-xs text-gray-400 font-medium mb-1">Token Contract</div>
+                        <div className="blockchain-address text-sm text-blue-300 break-all font-mono">{tokenAddress || 'Not available'}</div>
+                      </div>
+                      {property.totalSupply && (
+                        <div className="bg-gray-800/50 p-3 rounded-lg border border-blue-500/20 sm:col-span-2">
+                          <div className="text-xs text-gray-400 font-medium mb-1">Total Supply</div>
+                          <div className="text-sm text-green-400 font-medium">{formatUnits(property.totalSupply, 18)} tokens</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
               
               <div className="md:col-span-1 space-y-6">
-                <div className="bg-gray-800/50 p-4 rounded-lg text-center">
-                  <p className="text-gray-400 text-sm">Purchase options available on the Marketplace.</p>
-                  <div className="mt-4 flex flex-col gap-2">
+                <div className="bg-gradient-to-br from-gray-900/80 to-blue-900/20 backdrop-blur-sm p-5 rounded-xl border border-blue-500/30 shadow-[0_0_20px_rgba(59,130,246,0.15)]">
+                  <div className="text-center mb-4">
+                    <h3 className="text-lg font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 mb-2">Tokenized Ownership</h3>
+                    <p className="text-gray-300 text-sm">Purchase fractional ownership on the marketplace or create a new listing.</p>
+                  </div>
+                  
+                  <div className="flex flex-col gap-3">
                     <Link href="/marketplace" className="inline-block w-full">
-                        <Button 
-                          className="w-full crypto-btn"
-                        >
-                            <ShoppingCart className="mr-2 h-4 w-4" />
-                            Go to Marketplace
-                        </Button>
+                      <Button 
+                        className="w-full relative overflow-hidden group bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.5)] border border-blue-500/30"
+                      >
+                        <span className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/30 to-blue-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 animate-pulse-slow"></span>
+                        <ShoppingCart className="mr-2 h-4 w-4 text-blue-200" />
+                        <span className="relative z-10 font-medium">Go to Marketplace</span>
+                      </Button>
                     </Link>
+                    
                     {isConnected && tokenAddress && (
                       <Button 
-                        className="w-full crypto-btn"
+                        className="w-full relative overflow-hidden group bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.5)] border border-blue-500/30"
                         onClick={() => setShowCreateListingModal(true)}
                       >
-                        Create Listing
+                        <span className="absolute inset-0 bg-gradient-to-r from-purple-500/0 via-purple-500/30 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 animate-pulse-slow"></span>
+                        <span className="relative z-10 font-medium">Create Listing</span>
                       </Button>
                     )}
                   </div>
@@ -345,26 +376,32 @@ const TokenPropertyDetailPage = () => {
         </div>
       </main>
 
-      {/* Create Listing Modal */}
+      {/* Create Listing Modal - Enhanced with web3 styling */}
       {showCreateListingModal && property && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="glass-card rounded-lg max-w-md w-full p-6">
-            <div className="flex justify-between items-start mb-4">
-              <h2 className="text-xl font-bold">Create Property Listing</h2>
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="glass-card-vibrant rounded-xl max-w-md w-full p-6 border border-blue-500/30 shadow-[0_0_30px_rgba(59,130,246,0.2)]">
+            {/* Animated gradient border */}
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl blur-sm opacity-30 -z-10"></div>
+            
+            <div className="flex justify-between items-start mb-5">
+              <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">Create Property Listing</h2>
               <Button 
                 variant="ghost" 
-                className="h-8 w-8 p-0" 
+                className="h-8 w-8 p-0 text-gray-300 hover:text-white hover:bg-gray-800/50" 
                 onClick={() => setShowCreateListingModal(false)}
               >
                 ✕
               </Button>
             </div>
             
-            <div className="mb-4">
-              <h3 className="font-semibold">{property.metadata?.name}</h3>
-              <p className="text-sm text-gray-400">
-                Token: {tokenAddress?.slice(0, 6)}...{tokenAddress?.slice(-4)}
-              </p>
+            <div className="mb-5 bg-gray-900/50 p-3 rounded-lg border border-blue-500/20">
+              <h3 className="font-semibold text-white">{property.metadata?.name}</h3>
+              <div className="flex items-center mt-1">
+                <div className="blockchain-address text-xs text-blue-300 bg-gray-900/70 backdrop-blur-sm px-2 py-1 rounded-md border border-blue-500/30 font-mono">
+                  {tokenAddress?.slice(0, 6)}...{tokenAddress?.slice(-4)}
+                </div>
+                <span className="ml-2 text-xs text-gray-400">Token Contract</span>
+              </div>
             </div>
             
             <CreateListingForm 
@@ -381,4 +418,4 @@ const TokenPropertyDetailPage = () => {
   );
 };
 
-export default TokenPropertyDetailPage; 
+export default TokenPropertyDetailPage;
