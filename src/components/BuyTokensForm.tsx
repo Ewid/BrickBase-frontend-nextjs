@@ -82,8 +82,8 @@ const BuyTokensForm = ({ listing, onSuccess, onError }: BuyTokensFormProps) => {
         return;
       }
       
-      // Validate against max amount
-      const maxAmount = parseFloat(ethers.formatUnits(listing.tokenAmount, 18));
+      // Validate against max amount using listing.amount
+      const maxAmount = parseFloat(ethers.formatUnits(listing.amount, 18));
       if (amount > maxAmount) {
         setInputValid(false);
         return;
@@ -94,7 +94,7 @@ const BuyTokensForm = ({ listing, onSuccess, onError }: BuyTokensFormProps) => {
     } catch (e) {
       setInputValid(false);
     }
-  }, [userFriendlyAmount, listing.tokenAmount]);
+  }, [userFriendlyAmount, listing.amount]);
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,9 +141,9 @@ const BuyTokensForm = ({ listing, onSuccess, onError }: BuyTokensFormProps) => {
     }
   };
   
-  // Display max amount in user-friendly format
-  const maxUserFriendlyAmount = ethers.formatUnits(listing.tokenAmount, 18);
-  const maxAmount = formatCurrency(listing.tokenAmount);
+  // Display max amount in user-friendly format using listing.amount
+  const maxUserFriendlyAmount = ethers.formatUnits(listing.amount, 18);
+  const maxAmount = formatCurrency(listing.amount);
   
   // Set max value in user-friendly format
   const handleSetMax = () => {

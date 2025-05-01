@@ -1,13 +1,42 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Building2, MapPin, Maximize2, Bitcoin, Tag, Info, AlertTriangle, Hexagon, ExternalLink, Shield } from "lucide-react";
+import { 
+  Building2, MapPin, Maximize2, Bitcoin, Tag, Info, AlertTriangle, 
+  Hexagon, ExternalLink, Shield, BarChart3, 
+  Layers, DollarSign, Globe, Landmark
+} from "lucide-react";
 import { tryConvertIpfsUrl } from '@/services/marketplace';
 
 // Sample image URL for fallback when images fail to load
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1560518883-ce09059eeffa?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8cHJvcGVydHl8ZW58MHx8MHx8&auto=format&fit=crop&w=800&q=60";
+
+// Particle animation component for background effects
+const ParticleBackground = () => {
+  return (
+    <div className="absolute inset-0 overflow-hidden opacity-30 pointer-events-none">
+      <div className="absolute w-full h-full">
+        {[...Array(15)].map((_, i) => (
+          <div 
+            key={i}
+            className="absolute rounded-full bg-blue-400"
+            style={{
+              width: `${Math.random() * 4 + 1}px`,
+              height: `${Math.random() * 4 + 1}px`,
+              top: `${Math.random() * 100}%`,
+              left: `${Math.random() * 100}%`,
+              opacity: Math.random() * 0.5 + 0.3,
+              animation: `float ${Math.random() * 10 + 10}s linear infinite`,
+              animationDelay: `${Math.random() * 5}s`
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
 
 // Update the interface to handle both old and new property formats
 interface PropertyCardProps {
@@ -21,6 +50,10 @@ interface PropertyCardProps {
   imageUrl: string;
   sqft: number;
   featured?: boolean;
+  bedrooms?: number;
+  bathrooms?: number;
+  propertyType?: string;
+  availableAmount?: string; // <-- Add prop for available tokens
 }
 
 const PropertyCard = ({ 
@@ -33,8 +66,15 @@ const PropertyCard = ({
   cryptoPrice, 
   imageUrl, 
   sqft, 
-  featured = false 
+  featured = false,
+  bedrooms = 0,
+  bathrooms = 0,
+  propertyType = '',
+  availableAmount // <-- Destructure the new prop
 }: PropertyCardProps) => {
+  // Card tilt effect ref and state
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [tiltStyle, setTiltStyle] = useState({});
 
   const httpImageUrl = imageUrl ? tryConvertIpfsUrl(imageUrl) : FALLBACK_IMAGE; // Convert IPFS URL
   const [imgSrc, setImgSrc] = useState(httpImageUrl);
@@ -48,7 +88,37 @@ const PropertyCard = ({
     setImgError(false);
     setAddressError(!nftAddress);
   }, [imageUrl, nftAddress]);
+
+  // Handle mouse move for tilt effect
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!cardRef.current) return;
+    
+    const card = cardRef.current;
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    
+    const rotateX = (y - centerY) / 20;
+    const rotateY = (centerX - x) / 20;
+    
+    setTiltStyle({
+      transform: `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`,
+      transition: 'transform 0.1s ease'
+    });
+  };
   
+  // Reset tilt on mouse leave
+  const handleMouseLeave = () => {
+    setIsHovering(false);
+    setTiltStyle({
+      transform: 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)',
+      transition: 'transform 0.5s ease'
+    });
+  };
+
   const handleImageError = () => {
     // Use fallback image
     setImgSrc(FALLBACK_IMAGE);
@@ -56,26 +126,35 @@ const PropertyCard = ({
   };
 
   const renderPriceSection = () => {
-    if (price && cryptoPrice) {
+    if (price) {
       return (
-        <div>
-          <p className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 font-semibold text-xl drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]">{price}</p>
-          <div className="flex items-center text-gray-300 text-xs mt-1 bg-gray-800/50 px-2 py-1 rounded-full inline-block">
-            <Bitcoin className="h-3 w-3 mr-1 text-yellow-500" />
-            <span className="font-medium">{cryptoPrice}</span>
+        <div className="relative">
+          {/* Holographic price effect */}
+          <div className="absolute -inset-1 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-blue-500/20 rounded-lg blur-sm opacity-70 group-hover:opacity-100 transition-opacity duration-500"></div>
+          
+          <div className="relative bg-gray-900/70 backdrop-blur-md rounded-lg p-3 border border-blue-500/30">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs text-gray-400 font-medium">Price Per Token In USDC</span>
+              <div className="flex items-center">
+                <DollarSign className="h-3 w-3 text-green-400" />
+                <span className="text-xs text-green-400">USDC</span>
+              </div>
+            </div>
+            
+            <p className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-cyan-400 font-bold text-2xl drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)] tracking-tight">{price}</p>
+            
+            {/* Display Available Amount if provided */}
+            {availableAmount && (
+              <div className="flex justify-between items-center mt-2 pt-2 border-t border-blue-500/10">
+                 <span className="text-xs text-gray-400 font-medium">Available Tokens:</span>
+                 <span className="text-sm text-white font-semibold">{availableAmount}</span> 
+              </div>
+            )}
           </div>
         </div>
       );
     } else {
-      return (
-        <div className="text-sm text-gray-300 flex items-center bg-blue-900/20 px-2 py-1 rounded-md border border-blue-500/20">
-           <Info className="h-4 w-4 mr-1 text-blue-400" /> 
-           <span>Details via View Property</span>
-           {tokenAddress && (
-             <span className="ml-1 text-xs text-green-400 font-bold" title="Tokenized property">•</span>
-           )}
-        </div>
-      );
+      return null;
     }
   };
 
@@ -104,10 +183,16 @@ const PropertyCard = ({
 
   return (
     <Card 
-      className={`relative overflow-hidden glass-card-vibrant border-0 ${featured ? 'border-l-4 border-l-blue-500' : ''}`}
+      ref={cardRef}
+      className={`relative overflow-hidden glass-card-vibrant border-0 group ${featured ? 'border-l-4 border-l-blue-500' : ''}`}
       onMouseEnter={() => setIsHovering(true)}
-      onMouseLeave={() => setIsHovering(false)}
+      onMouseLeave={handleMouseLeave}
+      onMouseMove={handleMouseMove}
+      style={tiltStyle}
     >
+      {/* Particle background effect */}
+      <ParticleBackground />
+      
       {/* Animated gradient border with enhanced glow */}
       <div className={`absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl blur-sm opacity-0 transition-opacity duration-300 ${isHovering ? 'opacity-70' : ''} -z-10`}></div>
       
@@ -118,11 +203,10 @@ const PropertyCard = ({
             <Image 
               src={imgSrc}
               alt={title}
-              className="transition-transform duration-500 hover:scale-110 object-cover"
+              className="transition-transform duration-500 group-hover:scale-110 object-cover"
               fill
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
               onError={handleImageError}
-              loading="lazy"
               priority={featured}
             />
           ) : (
@@ -131,32 +215,44 @@ const PropertyCard = ({
             </div>
           )}
           
-          {/* Overlay with blockchain data */}
-          <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-transparent to-transparent"></div>
+          {/* Futuristic overlay with grid pattern */}
+          <div className="absolute inset-0 bg-gradient-to-t from-gray-900/90 via-gray-900/40 to-transparent hex-pattern opacity-70"></div>
           
-          {/* NFT Badge - enhanced */}
-          <div className="absolute top-3 left-3 nft-badge shadow-lg">
+          {/* Holographic effect overlay */}
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/5 to-transparent opacity-0 group-hover:opacity-40 transition-opacity duration-500"></div>
+          
+          {/* NFT Badge - enhanced with animation */}
+          <div className="absolute top-3 left-3 nft-badge shadow-lg group-hover:shadow-[0_0_10px_rgba(168,85,247,0.5)] transition-all duration-300">
             <Hexagon className="h-3 w-3 mr-1" fill="currentColor" strokeWidth={0} />
             <span className="font-medium">NFT #{id}</span>
           </div>
           
-          {/* Moved Verified Badge Here */}
-          <div className="blockchain-badge absolute top-3 right-3 flex-shrink-0 shadow-lg px-1.5 py-0.5 bg-gray-900/70 text-white rounded-md">
+          {/* Blockchain verification badge with animated glow */}
+          <div className="blockchain-badge absolute top-3 right-3 flex-shrink-0 shadow-lg group-hover:shadow-[0_0_10px_rgba(59,130,246,0.5)] transition-all duration-300">
             <Shield className="h-3 w-3 mr-0.5" /> 
             <span className="text-xs">Verified</span> 
           </div>
           
-          {/* Featured Badge - Adjusted position slightly if Verified badge is also present */}
-          {/* Consider removing this if Verified takes its place or adjusting styling */}
-          {/* {featured && ( 
-            <div className="absolute top-3 right-14 bg-gradient-to-r from-blue-500 to-purple-500 px-3 py-1 rounded-full text-xs font-medium text-white shadow-lg">
-              Featured
+          {/* Featured Badge with enhanced styling */}
+          {featured && ( 
+            <div className="absolute top-12 right-3 bg-gradient-to-r from-blue-500 to-purple-500 px-2 py-0.5 rounded-md text-xs font-medium text-white shadow-lg flex items-center">
+              <Tag className="h-3 w-3 mr-1" />
+              <span>Featured</span>
             </div>
-          )} */} 
+          )}
           
-          {/* Token Address - enhanced with glow */}
+          {/* Property type badge */}
+          {propertyType && (
+            <div className="absolute top-12 left-3 bg-gray-900/70 text-gray-300 px-2 py-0.5 rounded-md text-xs font-medium shadow-lg flex items-center border border-gray-700">
+              <Building2 className="h-3 w-3 mr-1 text-gray-400" />
+              <span>{propertyType}</span>
+            </div>
+          )}
+          
+          {/* Token Address with enhanced futuristic styling */}
           <div className="absolute bottom-3 left-3 right-3 flex justify-between items-center">
-            <div className="blockchain-address text-xs text-blue-300 bg-gray-900/80 backdrop-blur-sm px-2 py-1 rounded-md border border-blue-500/40 shadow-[0_0_5px_rgba(59,130,246,0.3)]">
+            <div className="blockchain-address text-xs text-blue-300 bg-gray-900/80 backdrop-blur-sm px-2 py-1 rounded-md border border-blue-500/40 shadow-[0_0_5px_rgba(59,130,246,0.3)] group-hover:shadow-[0_0_10px_rgba(59,130,246,0.5)] transition-all duration-300">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 mr-1 animate-pulse"></span>
               {shortenedAddress}
             </div>
             
@@ -165,7 +261,7 @@ const PropertyCard = ({
                 href={`https://basescan.org/token/${addressToUse}`} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="text-blue-300 hover:text-blue-400 transition-colors bg-gray-900/80 backdrop-blur-sm p-1 rounded-md border border-blue-500/30 shadow-[0_0_5px_rgba(59,130,246,0.3)]"
+                className="text-blue-300 hover:text-blue-400 transition-colors bg-gray-900/80 backdrop-blur-sm p-1 rounded-md border border-blue-500/30 shadow-[0_0_5px_rgba(59,130,246,0.3)] group-hover:shadow-[0_0_10px_rgba(59,130,246,0.5)] transition-all duration-300"
                 onClick={(e) => e.stopPropagation()}
               >
                 <ExternalLink className="h-4 w-4" />
@@ -177,22 +273,46 @@ const PropertyCard = ({
 
       {/* Content Section */}
       <CardContent className="p-4 flex-grow flex flex-col justify-between">
-        <div className="flex flex-col gap-2 mb-auto">
-          {/* Title with blockchain verification - enhanced contrast */}
+        <div className="flex flex-col gap-3 mb-auto">
+          {/* Title with enhanced styling */}
           <div className="flex items-start">
-            <h3 className="font-bold text-base line-clamp-1 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]" title={title}>
+            <h3 className="font-bold text-base line-clamp-1 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-cyan-400 drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]" title={title}>
               {title}
             </h3>
           </div>
           
-          {/* Location - improved visibility */}
-          <div className="flex items-center text-gray-300 text-xs backdrop-blur-sm bg-gray-900/30 px-2 py-1 rounded-md mt-1 shadow-inner">
-            <MapPin className="h-3 w-3 mr-1 flex-shrink-0 text-blue-400" />
+          {/* Location with enhanced styling */}
+          <div className="flex items-center text-gray-300 text-xs backdrop-blur-sm bg-gray-900/40 px-2 py-1.5 rounded-md shadow-inner border border-gray-800/50">
+            <MapPin className="h-3 w-3 mr-1.5 flex-shrink-0 text-blue-400" />
             <span className="line-clamp-1" title={location}>{location}</span>
           </div>
           
-          {/* Price Section with enhanced visibility */}
-          <div className="mt-3 bg-gray-900/40 backdrop-blur-sm p-2 rounded-md border border-blue-500/20">
+          {/* Property details with enhanced styling */}
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            {sqft > 0 && (
+              <div className="flex items-center gap-1 bg-gray-900/40 px-2 py-1 rounded-md border border-gray-800/50">
+                <Maximize2 className="h-3 w-3 text-gray-400" />
+                <span className="text-gray-300">{sqft} sqft</span>
+              </div>
+            )}
+            
+            {bedrooms > 0 && (
+              <div className="flex items-center gap-1 bg-gray-900/40 px-2 py-1 rounded-md border border-gray-800/50">
+                <Tag className="h-3 w-3 text-gray-400" />
+                <span className="text-gray-300">{bedrooms} Beds</span>
+              </div>
+            )}
+            
+            {bathrooms > 0 && (
+              <div className="flex items-center gap-1 bg-gray-900/40 px-2 py-1 rounded-md border border-gray-800/50">
+                <Tag className="h-3 w-3 text-gray-400" />
+                <span className="text-gray-300">{bathrooms} Baths</span>
+              </div>
+            )}
+          </div>
+          
+          {/* Price Section with enhanced styling */}
+          <div className="mt-2">
             {renderPriceSection()}
           </div>
         </div>
@@ -210,7 +330,7 @@ const PropertyCard = ({
           <Button 
             className="w-full relative overflow-hidden group bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.5)] border border-blue-500/30"
             disabled={!addressToUse}
-           > 
+          > 
             {/* Enhanced animated glow effect */}
             <span className="absolute top-0 left-0 w-full h-full bg-white/20 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300"></span>
             <span className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/30 to-blue-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 animate-pulse-slow"></span>
