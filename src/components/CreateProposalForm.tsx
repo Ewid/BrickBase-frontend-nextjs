@@ -11,7 +11,7 @@ import { useAccount } from '@/hooks/useAccount';
 import { ethers } from 'ethers';
 import CONTRACT_CONFIG from '@/config/contracts';
 import PropertyDAOABI from '@/abis/PropertyDAO.json';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { PropertyDto } from '@/types/dtos';
 import Image from 'next/image';
 import { tryConvertIpfsUrl, getTokenBalance } from '@/services/marketplace';
@@ -189,11 +189,11 @@ const CreateProposalForm = ({ ownedTokens, onSuccess, onClose }: CreateProposalF
           propertyTokenAddress
       );
 
-      toast({ title: "Transaction Submitted", description: "Waiting for confirmation..." });
+      toast.success("Transaction Submitted", { description: "Waiting for confirmation..." });
       await tx.wait();
 
       setSuccess(true);
-      toast({ title: "Proposal Created Successfully!" });
+      toast.success("Proposal Created Successfully!");
       // Optionally reset form fields here or let onClose handle it
       if (onSuccess) onSuccess();
       setTimeout(() => { // Delay closing slightly to show success
@@ -203,15 +203,18 @@ const CreateProposalForm = ({ ownedTokens, onSuccess, onClose }: CreateProposalF
     } catch (err: any) {
       console.error("Proposal creation failed:", err);
       const errorMsg = err.reason || err.message || "An error occurred while creating the proposal.";
-      setError(errorMsg);
-      setStep('enterDetails'); // Go back to details step on error
-      toast({
-          title: "Proposal Creation Failed",
-          description: errorMsg,
-          variant: "destructive"
-      });
+      // Defer state updates and toast to avoid render conflicts
+      setTimeout(() => {
+        setError(errorMsg);
+        setStep('enterDetails'); // Go back to details step on error
+        // Use sonner toast
+        toast.error("Proposal Creation Failed", {
+            description: errorMsg,
+        });
+      }, 0);
     } finally {
-      setIsSubmitting(false);
+      // Also defer this state update
+      setTimeout(() => setIsSubmitting(false), 0);
     }
   };
 

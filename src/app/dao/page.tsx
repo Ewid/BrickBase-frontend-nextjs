@@ -361,6 +361,12 @@ const ProposalCard = ({
     const propertyImageUrl = propertyDetails?.metadata?.image ? tryConvertIpfsUrl(propertyDetails.metadata.image) : null;
     const propertyName = propertyDetails?.metadata?.name;
 
+    // --- Add Logging --- 
+    useEffect(() => {
+      console.log(`ProposalCard ID ${proposal.id}: Using address ${proposal.propertyTokenAddress}. Found details:`, propertyDetails);
+    }, [proposal.id, proposal.propertyTokenAddress, propertyDetails]);
+    // --- End Logging ---
+
     return (
         <Card 
           key={proposal.id}
@@ -613,6 +619,9 @@ export default function DaoPage() {
             // Fetch property details for each proposal
             const tokenAddresses = Array.from(new Set(proposalsData.map(p => p.propertyTokenAddress).filter(Boolean))) as string[];
             if (tokenAddresses.length > 0) {
+                // --- Add Logging ---
+                console.log('DAO Page: Fetching details for token addresses:', tokenAddresses);
+                // --- End Logging ---
                 const detailsPromises = tokenAddresses.map(addr =>
                     getPropertyByTokenAddress(addr).catch(err => {
                         console.warn(`Failed to fetch details for token ${addr}:`, err);
@@ -620,10 +629,11 @@ export default function DaoPage() {
                     })
                 );
                 const detailsResults = await Promise.all(detailsPromises);
+                 // --- Add Logging ---
+                console.log('DAO Page: Fetched property details results:', detailsResults);
+                // --- End Logging ---
                 const newDetailsCache: Record<string, PropertyDto | null> = {};
-                tokenAddresses.forEach((addr, index) => {
-                    newDetailsCache[addr] = detailsResults[index];
-                });
+                tokenAddresses.forEach((addr, index) => { newDetailsCache[addr] = detailsResults[index]; });
                 setPropertyDetailsCache(newDetailsCache);
             } else {
                  setPropertyDetailsCache({});
