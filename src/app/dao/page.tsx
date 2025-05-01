@@ -8,7 +8,8 @@ import { Card, CardHeader, CardContent, CardFooter, CardTitle, CardDescription }
 import { 
   Loader2, AlertCircle, ThumbsUp, ThumbsDown, ExternalLink, PlusCircle, 
   Building2, Hexagon, Shield, Clock, BarChart3, Activity, Landmark, 
-  Users, Lock, Zap, Globe, RefreshCcw
+  Users, Lock, Zap, Globe, RefreshCcw,
+  PauseCircle, Hourglass, XCircle, PlayCircle, CheckCircle
 } from 'lucide-react';
 import { useAccount } from '@/hooks/useAccount';
 import { ethers } from 'ethers';
@@ -82,6 +83,9 @@ function getStatusColor(state: string): string {
         case 'executed': return 'text-green-400 bg-green-500/20 border-green-500/30'; 
         case 'defeated': return 'text-red-400 bg-red-500/20 border-red-500/30'; 
         case 'queued': return 'text-yellow-400 bg-yellow-500/20 border-yellow-500/30'; 
+        case 'pending': return 'text-yellow-400 bg-yellow-500/20 border-yellow-500/30';
+        case 'rejected': return 'text-red-400 bg-red-500/20 border-red-500/30';
+        case 'ready': return 'text-purple-400 bg-purple-500/20 border-purple-500/30';
         default: return 'text-gray-400 bg-gray-500/20 border-gray-500/30';
     }
 }
@@ -94,6 +98,9 @@ function getStatusIcon(state: string): React.ReactNode {
         case 'executed': return <Shield className="h-3 w-3 mr-1" />; 
         case 'defeated': return <ThumbsDown className="h-3 w-3 mr-1" />; 
         case 'queued': return <Clock className="h-3 w-3 mr-1" />; 
+        case 'pending': return <Hourglass className="h-3 w-3 mr-1" />;
+        case 'rejected': return <XCircle className="h-3 w-3 mr-1" />;
+        case 'ready': return <PlayCircle className="h-3 w-3 mr-1" />;
         default: return <Activity className="h-3 w-3 mr-1" />;
     }
 }
@@ -522,14 +529,14 @@ const ProposalCard = ({
                             <span className="absolute inset-0 bg-gradient-to-r from-green-500/0 via-green-500/20 to-green-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 group-focus:opacity-100"></span>
                         </Button>
                     </div>
-                ) : proposal.state.toLowerCase() === 'succeeded' && !proposal.executed ? (
+                ) : proposal.state.toLowerCase() === 'ready' ? (
                     <Button 
                         variant="outline"
                         disabled
-                        className="w-full border-blue-500/30 bg-blue-950/20 text-blue-400 cursor-not-allowed shadow-inner hover:bg-blue-950/30"
+                        className="w-full border-purple-500/30 bg-purple-950/20 text-purple-400 cursor-not-allowed shadow-inner hover:bg-purple-950/30 hover:text-purple-300 hover:border-purple-500/50 focus:shadow-[0_0_15px_rgba(168,85,247,0.5)] transition-all duration-300 cursor-pointer shadow-md"
                     >
-                        <Shield className="h-4 w-4 mr-2" />
-                        Ready for Execution
+                        <PlayCircle className="h-4 w-4 mr-2" />
+                        Execute Proposal
                     </Button>
                 ) : (
                     <div className="border border-gray-700/30 rounded-md p-2 bg-gray-800/20 backdrop-blur-sm w-full shadow-inner">
@@ -540,10 +547,11 @@ const ProposalCard = ({
                             </span>
                             <span className={`font-medium ${
                                 proposal.state.toLowerCase() === 'executed' ? 'text-green-400' : 
-                                proposal.state.toLowerCase() === 'defeated' ? 'text-red-400' : 
+                                proposal.state.toLowerCase() === 'rejected' ? 'text-red-400' : 
+                                proposal.state.toLowerCase() === 'pending' ? 'text-yellow-400' : 
                                 'text-gray-300'
                             }`}>
-                                {proposal.state}
+                                {proposal.state} 
                             </span>
                         </div>
                     </div>
@@ -561,6 +569,9 @@ const getStatusBorderColor = (state: string): string => {
         case 'executed': return 'border-green-500/50'; 
         case 'defeated': return 'border-red-500/50'; 
         case 'queued': return 'border-yellow-500/50'; 
+        case 'pending': return 'border-yellow-500/50';
+        case 'rejected': return 'border-red-500/50';
+        case 'ready': return 'border-purple-500/50';
         default: return 'border-gray-500/50';
     }
 }
@@ -940,6 +951,7 @@ export default function DaoPage() {
                                setToastMessage({ type: 'success', title: 'Proposal Created', description: 'Your proposal has been submitted.' });
                                fetchProposalsAndDetails();
                             }}
+                            onClose={() => setShowCreateProposalModal(false)}
                         />
                     </DialogContent>
                 </Dialog>
