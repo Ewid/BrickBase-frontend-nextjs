@@ -111,7 +111,7 @@ export interface InstallmentDto {
   termMonths: number;
   paidAmount: number;
   dueDate: Date;
-  status: string; // e.g., 'PENDING', 'PAID', 'OVERDUE'
+  status: string;
 }
 
 export interface InstallmentPlanDto {
