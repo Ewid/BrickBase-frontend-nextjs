@@ -47,3 +47,8 @@ vendor/
 *.gz
 /.next
 /.next
+
+.next/
+*.pack.gz
+*.hot-update.json
+*.tsbuildinfo

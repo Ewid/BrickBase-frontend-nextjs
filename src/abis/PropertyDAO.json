@@ -415,19 +415,6 @@
   },
   {
     "inputs": [],
-    "name": "propertyToken",
-    "outputs": [
-      {
-        "internalType": "contract IERC20",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
     "name": "proposalThreshold",
     "outputs": [
       {
