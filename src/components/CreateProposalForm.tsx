@@ -11,10 +11,10 @@ import { useAccount } from '@/hooks/useAccount';
 import { ethers } from 'ethers';
 import CONTRACT_CONFIG from '@/config/contracts';
 import PropertyDAOABI from '@/abis/PropertyDAO.json';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { PropertyDto } from '@/types/dtos';
 import Image from 'next/image';
-import { tryConvertIpfsUrl } from '@/services/marketplace';
+import { tryConvertIpfsUrl, getTokenBalance } from '@/services/marketplace';
 import {
   Select,
   SelectContent,
@@ -69,6 +69,34 @@ const CreateProposalForm = ({ ownedTokens, onSuccess, onClose }: CreateProposalF
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  // --- Fetch Balance Helper (Example - Adapt if needed) ---
+  const [tokenBalances, setTokenBalances] = useState<Record<string, string>>({});
+  const [loadingBalances, setLoadingBalances] = useState(false);
+
+  useEffect(() => {
+    const fetchBalances = async () => {
+      if (!account || ownedTokens.length === 0) return;
+      setLoadingBalances(true);
+      const balances: Record<string, string> = {};
+      for (const property of ownedTokens) {
+        const tokenAddress = property.tokenAddress || property.propertyDetails?.associatedPropertyToken;
+        if (tokenAddress) {
+          try {
+            const balance = await getTokenBalance(tokenAddress, account);
+            balances[tokenAddress] = ethers.formatUnits(balance, 18); // Assuming 18 decimals
+          } catch (err) {
+            console.warn(`Failed to fetch balance for ${tokenAddress}`, err);
+            balances[tokenAddress] = 'Error';
+          }
+        }
+      }
+      setTokenBalances(balances);
+      setLoadingBalances(false);
+    };
+    fetchBalances();
+  }, [ownedTokens, account]);
+  // --- End Fetch Balance Helper ---
 
   const handlePropertySelect = (property: PropertyDto) => {
     setSelectedProperty(property);
@@ -161,11 +189,11 @@ const CreateProposalForm = ({ ownedTokens, onSuccess, onClose }: CreateProposalF
           propertyTokenAddress
       );
 
-      toast({ title: "Transaction Submitted", description: "Waiting for confirmation..." });
+      toast.success("Transaction Submitted", { description: "Waiting for confirmation..." });
       await tx.wait();
 
       setSuccess(true);
-      toast({ title: "Proposal Created Successfully!" });
+      toast.success("Proposal Created Successfully!");
       // Optionally reset form fields here or let onClose handle it
       if (onSuccess) onSuccess();
       setTimeout(() => { // Delay closing slightly to show success
@@ -175,15 +203,18 @@ const CreateProposalForm = ({ ownedTokens, onSuccess, onClose }: CreateProposalF
     } catch (err: any) {
       console.error("Proposal creation failed:", err);
       const errorMsg = err.reason || err.message || "An error occurred while creating the proposal.";
-      setError(errorMsg);
-      setStep('enterDetails'); // Go back to details step on error
-      toast({
-          title: "Proposal Creation Failed",
-          description: errorMsg,
-          variant: "destructive"
-      });
+      // Defer state updates and toast to avoid render conflicts
+      setTimeout(() => {
+        setError(errorMsg);
+        setStep('enterDetails'); // Go back to details step on error
+        // Use sonner toast
+        toast.error("Proposal Creation Failed", {
+            description: errorMsg,
+        });
+      }, 0);
     } finally {
-      setIsSubmitting(false);
+      // Also defer this state update
+      setTimeout(() => setIsSubmitting(false), 0);
     }
   };
 
@@ -231,6 +262,7 @@ const CreateProposalForm = ({ ownedTokens, onSuccess, onClose }: CreateProposalF
       <div className="space-y-6">
         {renderStepIndicator()}
         <h3 className="text-lg font-medium text-gray-100">Select Property for Proposal</h3>
+        <p className="text-sm text-gray-400">Choose the property token that grants voting rights for this proposal.</p>
         {/* Use marketplace list item styling */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-1">
           {ownedTokens.length === 0 ? (
@@ -243,35 +275,43 @@ const CreateProposalForm = ({ ownedTokens, onSuccess, onClose }: CreateProposalF
             if (!tokenAddress) return null;
 
             return (
-              // Use marketplace style for list items
+              // Enhanced property selection card
               <div 
                 key={key}
                 onClick={() => handlePropertySelect(property)}
-                className="border border-gray-800 hover:border-blue-600/40 rounded-xl p-4 cursor-pointer transition-all bg-gray-900/50 hover:bg-blue-900/30"
+                className="border border-gray-700/50 hover:border-blue-600/60 rounded-xl p-4 cursor-pointer transition-all duration-300 bg-gray-900/40 hover:bg-blue-900/20 shadow-md hover:shadow-blue-500/10 flex items-center gap-4"
               >
-                <div className="flex gap-3 items-center">
-                  <div className="w-12 h-12 rounded-md bg-gray-800 overflow-hidden flex-shrink-0">
-                    {imageUrl ? (
-                      <Image 
+                {/* Larger Image */} 
+                <div className="relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border border-gray-700">
+                  {imageUrl ? (
+                     <Image 
                         src={imageUrl} 
-                        alt={property.metadata?.name || 'Property'} 
-                        width={48} // Use size consistent with marketplace modal
-                        height={48} 
-                        className="object-cover w-full h-full"
+                        alt={property.metadata?.name || 'Property'}
+                        fill 
+                        className="object-cover" 
+                        sizes="64px"
                       />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Building2 className="h-6 w-6 text-gray-600" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-medium truncate text-gray-100">{property.metadata?.name || 'Unnamed Property'}</h4>
-                    <div className="flex justify-between items-center text-xs text-gray-400">
-                      <span>Token ID: {formatTokenId(property.tokenId)}</span>
-                      {/* Maybe add balance here if useful? Requires fetching */}
+                  ) : (
+                    <div className="w-full h-full bg-gray-800 flex items-center justify-center">
+                      <Building2 className="w-8 h-8 text-gray-500" />
                     </div>
-                    <p className="text-xs text-gray-500 break-words mt-1">Addr: {shortenAddress(tokenAddress)}</p>
+                  )}
+                </div>
+                {/* Property Details & Balance */} 
+                <div className="flex-grow overflow-hidden">
+                  <p className="text-base font-semibold text-white truncate" title={property.metadata?.name || 'Unknown Property'}>
+                    {property.metadata?.name || 'Unknown Property'}
+                  </p>
+                  <p className="text-xs text-gray-400 truncate" title={tokenAddress}>Token: {shortenAddress(tokenAddress || '')}</p>
+                   {/* Display Balance */}
+                  <div className="mt-1">
+                    {loadingBalances ? (
+                        <p className="text-xs text-purple-400 flex items-center"><Loader2 className="h-3 w-3 mr-1 animate-spin"/>Loading balance...</p>
+                    ) : tokenBalances[tokenAddress] ? (
+                        <p className="text-xs text-purple-400">Your Balance: {tokenBalances[tokenAddress]}</p>
+                    ) : (
+                        <p className="text-xs text-gray-500">Balance unavailable</p>
+                    )}
                   </div>
                 </div>
               </div>

@@ -231,7 +231,7 @@ export const cancelListing = async (listingId: string) => {
 };
 
 // Buy tokens from a listing using USDC
-export const buyTokensFromListing = async (listingId: string, amount: string) => {
+export const buyTokensFromListing = async (listingId: string, amount: bigint) => {
   try {
     try {
       // Get the listing details from the contract
@@ -309,7 +309,7 @@ export const buyTokensFromListing = async (listingId: string, amount: string) =>
       const marketplaceAddress = CONTRACT_CONFIG.PROPERTY_MARKETPLACE_ADDRESS;
       
       // Approve USDC transfer
-      const approveTx = await usdcContract.approve(marketplaceAddress, totalPrice.toString());
+      const approveTx = await usdcContract.approve(marketplaceAddress, totalPrice);
       await approveTx.wait();
       
       // Create marketplace contract instance with the signer
